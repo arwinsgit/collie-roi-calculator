@@ -120,7 +120,7 @@
       font-weight: 500; line-height: 1.3;
     }
     .field-input-group { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-    .field-input-group input[type="number"] {
+    .field-input-group .num-input {
       padding: 8px 10px; border-radius: 8px;
       border: 1.5px solid var(--border-field);
       font-size: 16px; font-weight: 600;
@@ -129,10 +129,10 @@
       background: white; text-align: right;
       font-family: var(--font-body);
     }
-    .field-input-group input[type="number"]:focus {
+    .field-input-group .num-input:focus {
       border-color: var(--collie-lime-dark);
     }
-    .field-input-group input[type="number"]:read-only {
+    .field-input-group .num-input[readonly] {
       background: #f5f5f5; color: rgba(21,36,53,0.4);
       cursor: not-allowed;
     }
@@ -212,7 +212,7 @@
     .compare-row .compare-label {
       font-size: 13px; font-weight: 500; color: var(--collie-navy);
     }
-    .compare-row input[type="number"] {
+    .compare-row .num-input {
       padding: 7px 8px; border-radius: 8px;
       border: 1.5px solid var(--border-field);
       font-size: 15px; font-weight: 600;
@@ -221,10 +221,10 @@
       font-family: var(--font-body);
       background: white;
     }
-    .compare-row input[type="number"]:focus {
+    .compare-row .num-input:focus {
       border-color: var(--collie-lime-dark);
     }
-    .compare-row input[type="number"]:read-only {
+    .compare-row .num-input[readonly] {
       background: #f5f5f5; color: rgba(21,36,53,0.4);
       cursor: not-allowed;
     }
@@ -368,7 +368,7 @@
     @media (max-width: 480px) {
       .card { padding: 20px 16px; }
       .field-row { margin: 0 -6px; padding: 10px 8px; }
-      .field-input-group input[type="number"] { width: 80px; font-size: 15px; }
+      .field-input-group .num-input { width: 80px; font-size: 15px; }
       .compare-header { grid-template-columns: 1fr 80px 80px; }
       .compare-row { grid-template-columns: 1fr 80px 80px; }
       .compare-row input { font-size: 14px; }
@@ -376,12 +376,10 @@
       .result-hero .hero-value { font-size: 28px; }
     }
 
-    /* Hide number input spinners */
-    input[type="number"]::-webkit-outer-spin-button,
-    input[type="number"]::-webkit-inner-spin-button {
-      -webkit-appearance: none; margin: 0;
+    /* Numeric text inputs styling */
+    input[type="text"].num-input {
+      -moz-appearance: textfield;
     }
-    input[type="number"] { -moz-appearance: textfield; }
   </style>
 </head>
 <body>
@@ -400,6 +398,31 @@
 // ============================================================
 // STORAGE: No backend — all data stays local
 // ============================================================
+
+// ============================================================
+// INPUT HELPERS: Dutch decimal (comma) support + select on click
+// ============================================================
+function parseNum(val) {
+  if (val === '' || val == null) return null;
+  return Number(String(val).replace(',', '.'));
+}
+
+function formatDisplay(val) {
+  if (val == null || val === '') return '';
+  return String(val).replace('.', ',');
+}
+
+function handleNumFocus(el) {
+  el._justFocused = true;
+  setTimeout(() => el.select());
+}
+
+function handleNumMouseUp(el, e) {
+  if (el._justFocused) {
+    e.preventDefault();
+    el._justFocused = false;
+  }
+}
 
 // ============================================================
 // SCENARIOS (seed data from briefing)
@@ -823,13 +846,14 @@ function renderTeaser(el) {
 }
 
 function fieldRow(id, label, value, unit) {
-  const displayVal = value != null ? value : '';
+  const displayVal = value != null ? formatDisplay(value) : '';
   return `
     <div class="field-row">
       <div class="field-label">${label}</div>
       <div class="field-input-group">
-        <input type="number" value="${displayVal}" min="0" id="input-${id}"
-          onfocus="setTimeout(() => this.select())"
+        <input type="text" inputmode="decimal" class="num-input" value="${displayVal}" id="input-${id}"
+          onfocus="handleNumFocus(this)"
+          onmouseup="handleNumMouseUp(this, event)"
           oninput="updateTeaser('${id}', this.value)">
         <span class="field-unit">${unit}</span>
       </div>
@@ -853,10 +877,10 @@ function toggleRow(id, label, value) {
 function updateTeaser(field, value) {
   teaserResult = null;
   switch (field) {
-    case 'numCows': teaserInputs.numCows = value !== '' ? Number(value) : null; break;
-    case 'hectares': teaserInputs.hectaresAvailable = value !== '' ? Number(value) : null; break;
-    case 'hours': teaserInputs.currentGrazingHours = value !== '' ? Number(value) : null; break;
-    case 'days': teaserInputs.currentGrazingDays = value !== '' ? Number(value) : null; break;
+    case 'numCows': teaserInputs.numCows = parseNum(value); break;
+    case 'hectares': teaserInputs.hectaresAvailable = parseNum(value); break;
+    case 'hours': teaserInputs.currentGrazingHours = parseNum(value); break;
+    case 'days': teaserInputs.currentGrazingDays = parseNum(value); break;
     case 'robot': teaserInputs.hasRobot = value; render(); return;
   }
   renderNav();
@@ -983,24 +1007,25 @@ function renderPrijzen(el) {
     <div class="card">
       <h2>Prijzen & kosten</h2>
       <p class="subtitle">We hebben gemiddelde NL-waarden ingevuld. Pas aan naar jouw situatie.</p>
-      ${priceRow('Melkprijs', m.milkPrice, '€/kg', 'market.milkPrice', 0.01)}
-      ${priceRow('Krachtvoer prijs', m.concentratePrice, '€/kg DS', 'market.concentratePrice', 0.01)}
-      ${priceRow('Bijproducten prijs', m.byproductPrice, '€/kg DS', 'market.byproductPrice', 0.01)}
-      ${priceRow('Strooisel kosten', m.litterCost, '€/dag', 'market.litterCost', 0.5)}
-      ${priceRow('Mestuitrijden kosten', m.manureSpreadCost, '€/m³', 'market.manureSpreadCost', 0.5)}
-      ${priceRow('Arbeid waarde', m.labourCost, '€/uur', 'market.labourCost', 1)}
+      ${priceRow('Melkprijs', m.milkPrice, '€/kg', 'market.milkPrice')}
+      ${priceRow('Krachtvoer prijs', m.concentratePrice, '€/kg DS', 'market.concentratePrice')}
+      ${priceRow('Bijproducten prijs', m.byproductPrice, '€/kg DS', 'market.byproductPrice')}
+      ${priceRow('Strooisel kosten', m.litterCost, '€/dag', 'market.litterCost')}
+      ${priceRow('Mestuitrijden kosten', m.manureSpreadCost, '€/m³', 'market.manureSpreadCost')}
+      ${priceRow('Arbeid waarde', m.labourCost, '€/uur', 'market.labourCost')}
     </div>
   `;
 }
 
-function priceRow(label, value, unit, path, step) {
+function priceRow(label, value, unit, path) {
   return `
     <div class="field-row">
       <div class="field-label">${label}</div>
       <div class="field-input-group">
-        <input type="number" value="${value}" step="${step}" min="0"
-          onfocus="setTimeout(() => this.select())"
-          oninput="updateCalcState('${path}', Number(this.value)); renderNav()">
+        <input type="text" inputmode="decimal" class="num-input" value="${formatDisplay(value)}"
+          onfocus="handleNumFocus(this)"
+          onmouseup="handleNumMouseUp(this, event)"
+          oninput="updateCalcState('${path}', parseNum(this.value)); renderNav()">
         <span class="field-unit">${unit}</span>
       </div>
     </div>
@@ -1102,26 +1127,27 @@ function renderResultaat(el) {
 // ============================================================
 // COMPARISON ROW HELPER
 // ============================================================
-function compareRow(label, valNu, valCollie, unit, pathNu, pathCollie, step = 1) {
+function compareRow(label, valNu, valCollie, unit, pathNu, pathCollie) {
   const readonlyNu = !pathNu;
   const readonlyCollie = !pathCollie;
   const isReadonlyRow = readonlyNu && readonlyCollie;
 
-  const decNu = String(step).includes('.') ? String(step).split('.')[1].length : 0;
-  const displayNu = typeof valNu === 'number' ? valNu : '';
-  const displayCollie = typeof valCollie === 'number' ? valCollie : '';
+  const displayNu = typeof valNu === 'number' ? formatDisplay(valNu) : '';
+  const displayCollie = typeof valCollie === 'number' ? formatDisplay(valCollie) : '';
 
   return `
     <div class="compare-row ${isReadonlyRow ? 'readonly' : ''}">
       <div class="compare-label">${label} <span style="font-size:11px;color:rgba(21,36,53,0.3)">${unit}</span></div>
-      <input type="number" value="${displayNu}" step="${step}" min="0"
+      <input type="text" inputmode="decimal" class="num-input" value="${displayNu}"
         ${readonlyNu ? 'readonly' : ''}
-        onfocus="setTimeout(() => this.select())"
-        oninput="updateCalcState('${pathNu}', Number(this.value)); recalcDerived(); render()">
-      <input type="number" value="${displayCollie}" step="${step}" min="0"
+        onfocus="handleNumFocus(this)"
+        onmouseup="handleNumMouseUp(this, event)"
+        oninput="updateCalcState('${pathNu}', parseNum(this.value)); recalcDerived(); render()">
+      <input type="text" inputmode="decimal" class="num-input" value="${displayCollie}"
         ${readonlyCollie ? 'readonly' : ''}
-        onfocus="setTimeout(() => this.select())"
-        oninput="updateCalcState('${pathCollie}', Number(this.value)); recalcDerived(); render()">
+        onfocus="handleNumFocus(this)"
+        onmouseup="handleNumMouseUp(this, event)"
+        oninput="updateCalcState('${pathCollie}', parseNum(this.value)); recalcDerived(); render()">
     </div>
   `;
 }
