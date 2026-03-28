@@ -703,14 +703,18 @@ function renderNav() {
   const step = STEPS[currentStep];
 
   if (step.id === 'teaser') {
-    const allFilled = teaserInputs.numCows > 0 && teaserInputs.hectaresAvailable > 0
-      && teaserInputs.currentGrazingHours > 0 && teaserInputs.currentGrazingDays > 0;
-    nav.innerHTML = `
-      <div></div>
-      <button class="nav-btn next" ${!allFilled ? 'disabled' : ''} onclick="handleTeaserCalculate()">
-        Bereken
-      </button>
-    `;
+    if (teaserResult) {
+      nav.innerHTML = '';
+    } else {
+      const allFilled = teaserInputs.numCows > 0 && teaserInputs.hectaresAvailable > 0
+        && teaserInputs.currentGrazingHours > 0 && teaserInputs.currentGrazingDays > 0;
+      nav.innerHTML = `
+        <div></div>
+        <button class="nav-btn next" ${!allFilled ? 'disabled' : ''} onclick="handleTeaserCalculate()">
+          Bereken
+        </button>
+      `;
+    }
     return;
   }
 
@@ -722,25 +726,11 @@ function renderNav() {
     return;
   }
 
-  // Mini result for steps 3-6
-  let miniHtml = '';
-  if (calcState && currentStep >= 2) {
-    const r = calculate(calcState);
-    const cls = r.netBenefit >= 0 ? 'pos' : 'neg';
-    miniHtml = `
-      <div class="mini-result">
-        <div class="mini-label">Netto rendement</div>
-        <div class="mini-value ${cls}">${formatEuro(r.netBenefit)}</div>
-      </div>
-    `;
-  }
-
   const nextLabel = step.id === 'contact' ? 'Ga verder' : 'Volgende';
   const nextDisabled = step.id === 'contact' && !isContactValid();
 
   nav.innerHTML = `
     <button class="nav-btn prev" onclick="prevStep()">Vorige</button>
-    ${miniHtml}
     <button class="nav-btn next" ${nextDisabled ? 'disabled' : ''} onclick="nextStep()">
       ${nextLabel}
     </button>
