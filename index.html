@@ -822,32 +822,28 @@ function renderTeaser(el) {
     <div class="card">
       <h2>Bereken wat Collie voor jou kan opleveren</h2>
       <p class="subtitle">Vul je bedrijfsgegevens in voor een eerste schatting.</p>
-      ${fieldRow('numCows', 'Hoeveel melkkoeien heb je?', teaserInputs.numCows, 'koeien', 'Vul het aantal melkkoeien in dat je wilt beweiden met Collie.')}
-      ${fieldRow('hectares', 'Hoeveel hectare grasland kun je beweiden?', teaserInputs.hectaresAvailable, 'hectare', 'Het totaal beschikbare grasland voor beweiding.')}
-      ${fieldRow('hours', 'Hoeveel uren per jaar weiden je koeien nu?', teaserInputs.currentGrazingHours, 'uren/jaar', 'Tel alle uren op dat je koeien buiten lopen. Bijv. 180 dagen × 10 uur = 1.800 uur.')}
-      ${fieldRow('days', 'Hoeveel dagen per jaar weiden je koeien nu?', teaserInputs.currentGrazingDays, 'dagen/jaar', 'Het aantal dagen dat je koeien (deels) buiten lopen.')}
+      ${fieldRow('numCows', 'Hoeveel melkkoeien heb je?', teaserInputs.numCows, 'koeien')}
+      ${fieldRow('hectares', 'Hoeveel hectare grasland kun je beweiden?', teaserInputs.hectaresAvailable, 'hectare')}
+      ${fieldRow('hours', 'Hoeveel uren per jaar weiden je koeien nu?', teaserInputs.currentGrazingHours, 'uren/jaar')}
+      ${fieldRow('days', 'Hoeveel dagen per jaar weiden je koeien nu?', teaserInputs.currentGrazingDays, 'dagen/jaar')}
       ${toggleRow('robot', 'Melkrobot', teaserInputs.hasRobot)}
       ${resultHtml}
     </div>
   `;
 }
 
-function fieldRow(id, label, value, unit, info) {
-  const isFocused = focusedField === id;
+function fieldRow(id, label, value, unit) {
   const displayVal = value != null ? value : '';
-  let infoHtml = isFocused && info ? `<div class="field-info">${info}</div>` : '';
   return `
-    <div class="field-row ${isFocused ? 'focused' : ''}" onclick="setFocus('${id}')">
+    <div class="field-row">
       <div class="field-label">${label}</div>
       <div class="field-input-group">
         <input type="number" value="${displayVal}" min="0" id="input-${id}"
-          onclick="event.stopPropagation(); setFocus('${id}')"
-          onfocus="this.select()"
+          onfocus="setTimeout(() => this.select())"
           oninput="updateTeaser('${id}', this.value)">
         <span class="field-unit">${unit}</span>
       </div>
     </div>
-    ${infoHtml}
   `;
 }
 
@@ -863,15 +859,6 @@ function toggleRow(id, label, value) {
   `;
 }
 
-function setFocus(id) {
-  if (focusedField === id) return;
-  focusedField = id;
-  render();
-  setTimeout(() => {
-    const input = document.getElementById('input-' + id);
-    if (input) input.focus();
-  }, 10);
-}
 
 function updateTeaser(field, value) {
   teaserResult = null;
@@ -971,7 +958,7 @@ function renderVoer(el) {
   el.innerHTML = `
     <div class="card">
       <h2>Voerrantsoen</h2>
-      <p class="subtitle">Vergelijk het voerrantsoen per koe per dag. Weidegras en graskuil worden automatisch berekend.</p>
+      <p class="subtitle">Vergelijk het voerrantsoen per koe per dag.</p>
 
       <div class="section-divider">Weidedagen</div>
       <div class="compare-header">
@@ -979,8 +966,8 @@ function renderVoer(el) {
         <div class="col-nu">Nu</div>
         <div class="col-collie">Met Collie</div>
       </div>
-      ${compareRow('Weidegras opname', fg.grassIntake, cg.newGrassIntake, 'kg DS', null, null)}
-      ${compareRow('Graskuil opname', fg.grassSilageIntake, cg.newGrassSilageIntake, 'kg DS', null, null)}
+      ${compareRow('Weidegras opname', fg.grassIntake, cg.newGrassIntake, 'kg DS', 'feedGrazing.grassIntake', 'collieGrazing.newGrassIntake', 0.5)}
+      ${compareRow('Graskuil opname', fg.grassSilageIntake, cg.newGrassSilageIntake, 'kg DS', 'feedGrazing.grassSilageIntake', 'collieGrazing.newGrassSilageIntake', 0.5)}
       ${compareRow('Krachtvoer opname', fg.concentrateIntake, cg.newConcentrateIntake, 'kg DS', 'feedGrazing.concentrateIntake', 'collieGrazing.newConcentrateIntake', 0.5)}
       ${compareRow('Maiskuil opname', fg.maizeSilageIntake, cg.newMaizeSilageIntake, 'kg DS', 'feedGrazing.maizeSilageIntake', 'collieGrazing.newMaizeSilageIntake', 0.5)}
       ${compareRow('Bijproducten opname', fg.byproductIntake, cg.newByproductIntake, 'kg DS', 'feedGrazing.byproductIntake', 'collieGrazing.newByproductIntake', 0.5)}
@@ -1022,7 +1009,7 @@ function priceRow(label, value, unit, path, step) {
       <div class="field-label">${label}</div>
       <div class="field-input-group">
         <input type="number" value="${value}" step="${step}" min="0"
-          onfocus="this.select()"
+          onfocus="setTimeout(() => this.select())"
           oninput="updateCalcState('${path}', Number(this.value)); renderNav()">
         <span class="field-unit">${unit}</span>
       </div>
@@ -1139,11 +1126,11 @@ function compareRow(label, valNu, valCollie, unit, pathNu, pathCollie, step = 1)
       <div class="compare-label">${label} <span style="font-size:11px;color:rgba(21,36,53,0.3)">${unit}</span></div>
       <input type="number" value="${displayNu}" step="${step}" min="0"
         ${readonlyNu ? 'readonly' : ''}
-        onfocus="this.select()"
+        onfocus="setTimeout(() => this.select())"
         oninput="updateCalcState('${pathNu}', Number(this.value)); recalcDerived(); render()">
       <input type="number" value="${displayCollie}" step="${step}" min="0"
         ${readonlyCollie ? 'readonly' : ''}
-        onfocus="this.select()"
+        onfocus="setTimeout(() => this.select())"
         oninput="updateCalcState('${pathCollie}', Number(this.value)); recalcDerived(); render()">
     </div>
   `;
