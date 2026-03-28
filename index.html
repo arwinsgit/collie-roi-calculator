@@ -840,8 +840,8 @@ function fieldRow(id, label, value, unit, info) {
     <div class="field-row ${isFocused ? 'focused' : ''}" onclick="setFocus('${id}')">
       <div class="field-label">${label}</div>
       <div class="field-input-group">
-        <input type="number" value="${displayVal}" min="0"
-          onfocus="setFocus('${id}')"
+        <input type="number" value="${displayVal}" min="0" id="input-${id}"
+          onclick="event.stopPropagation(); setFocus('${id}')"
           oninput="updateTeaser('${id}', this.value)">
         <span class="field-unit">${unit}</span>
       </div>
@@ -862,16 +862,24 @@ function toggleRow(id, label, value) {
   `;
 }
 
-function setFocus(id) { focusedField = id; render(); }
+function setFocus(id) {
+  if (focusedField === id) return;
+  focusedField = id;
+  render();
+  setTimeout(() => {
+    const input = document.getElementById('input-' + id);
+    if (input) input.focus();
+  }, 10);
+}
 
 function updateTeaser(field, value) {
-  teaserResult = null; // Reset result on change
+  teaserResult = null;
   switch (field) {
-    case 'numCows': teaserInputs.numCows = value ? Number(value) : null; break;
-    case 'hectares': teaserInputs.hectaresAvailable = value ? Number(value) : null; break;
-    case 'hours': teaserInputs.currentGrazingHours = value ? Number(value) : null; break;
-    case 'days': teaserInputs.currentGrazingDays = value ? Number(value) : null; break;
-    case 'robot': teaserInputs.hasRobot = value; break;
+    case 'numCows': teaserInputs.numCows = value !== '' ? Number(value) : null; break;
+    case 'hectares': teaserInputs.hectaresAvailable = value !== '' ? Number(value) : null; break;
+    case 'hours': teaserInputs.currentGrazingHours = value !== '' ? Number(value) : null; break;
+    case 'days': teaserInputs.currentGrazingDays = value !== '' ? Number(value) : null; break;
+    case 'robot': teaserInputs.hasRobot = value; render(); return;
   }
   renderNav();
 }
