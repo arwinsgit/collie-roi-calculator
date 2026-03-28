@@ -6,7 +6,6 @@
   <title>Collie ROI Calculator</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
       --collie-lime: #CDDC7F;
@@ -399,14 +398,8 @@
 
 <script>
 // ============================================================
-// SUPABASE CONFIG (fill in after creating project)
+// STORAGE: No backend — all data stays local
 // ============================================================
-const SUPABASE_URL = '';  // e.g. 'https://xxxxx.supabase.co'
-const SUPABASE_ANON_KEY = '';
-let supabase = null;
-if (SUPABASE_URL && SUPABASE_ANON_KEY) {
-  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-}
 
 // ============================================================
 // SCENARIOS (seed data from briefing)
@@ -474,8 +467,6 @@ const STEPS = [
 // ============================================================
 let currentStep = 0;
 let focusedField = null;
-let leadId = null;
-
 // Teaser inputs (user fills in)
 const teaserInputs = {
   numCows: null,
@@ -762,9 +753,6 @@ function prevStep() {
 
 function nextStep() {
   if (currentStep < STEPS.length - 1) {
-    if (STEPS[currentStep].id === 'contact') {
-      saveLead();
-    }
     currentStep++;
     focusedField = null;
     render();
@@ -792,48 +780,6 @@ function handleTeaserCalculate() {
   render();
 }
 
-// ============================================================
-// SUPABASE: Save lead
-// ============================================================
-async function saveLead() {
-  if (!supabase) return;
-  try {
-    const { data, error } = await supabase.from('leads').insert({
-      naam: contactData.naam,
-      email: contactData.email,
-      bedrijfsnaam: contactData.bedrijfsnaam,
-      telefoon: contactData.telefoon,
-      provincie: contactData.provincie,
-      aantal_koeien: teaserInputs.numCows,
-      hectares: teaserInputs.hectaresAvailable,
-      uren_nu: teaserInputs.currentGrazingHours,
-      dagen_nu: teaserInputs.currentGrazingDays,
-      melkrobot: teaserInputs.hasRobot,
-    }).select('id').single();
-    if (data) leadId = data.id;
-  } catch (e) { console.error('Lead save error:', e); }
-}
-
-async function saveBerekening() {
-  if (!supabase || !calcState) return;
-  try {
-    const r = calculate(calcState);
-    await supabase.from('berekeningen').insert({
-      lead_id: leadId,
-      stap: 'resultaat',
-      netto_rendement: r.netBenefit,
-      bruto_baten: r.grossBenefit,
-      collar_kosten: r.collarCost,
-      arbeid_besparing: r.labourSaving,
-      krachtvoer_besparing: r.concentrateSaving,
-      kuilvoer_besparing: r.silageSaving,
-      strooisel_besparing: r.litterSaving,
-      mest_besparing: r.manureSaving,
-      extra_melk: r.milkSaving,
-      form_data: calcState,
-    });
-  } catch (e) { console.error('Berekening save error:', e); }
-}
 
 // ============================================================
 // CONTENT RENDERERS
@@ -1078,9 +1024,6 @@ function priceRow(label, value, unit, path, step) {
 function renderResultaat(el) {
   if (!calcState) return;
   const r = calculate(calcState);
-
-  // Save to Supabase
-  saveBerekening();
 
   // Breakdown items
   const items = [
