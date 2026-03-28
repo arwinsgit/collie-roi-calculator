@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Collie ROI Calculator</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      background: linear-gradient(170deg, #f0f7ec 0%, #e0edd8 50%, #d4e4cc 100%);
+      display: flex; justify-content: center;
+      padding: 24px 16px;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+    .container { max-width: 560px; width: 100%; }
+
+    /* Header */
+    .header { text-align: center; margin-bottom: 20px; }
+    .header h1 { font-size: 28px; font-weight: 800; color: #1a2e1a; letter-spacing: -1px; }
+    .header p { font-size: 14px; color: #5a7a5a; margin-top: 4px; }
+
+    /* Section progress */
+    .section-progress { display: flex; gap: 4px; margin-bottom: 6px; }
+    .section-dot {
+      flex: 1; height: 6px; border-radius: 3px; transition: background 0.3s; cursor: pointer;
+    }
+    .section-dot.done { background: #3a6b35; }
+    .section-dot.active { background: #7abb75; }
+    .section-dot.future { background: #d4e4cc; }
+    .section-labels {
+      display: flex; justify-content: space-between; margin-bottom: 16px;
+      font-size: 11px; color: #6b8a6b; font-weight: 500;
+    }
+    .section-labels span { cursor: pointer; transition: color 0.2s; }
+    .section-labels span.active { color: #3a6b35; font-weight: 700; }
+
+    /* Card */
+    .card {
+      background: white; border-radius: 20px; padding: 28px 24px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.08);
+      animation: cardIn 0.3s ease;
+    }
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .card h2 { font-size: 22px; color: #1a2e1a; margin-bottom: 4px; font-weight: 700; }
+    .card .subtitle { font-size: 13px; color: #6b8a6b; margin-bottom: 20px; line-height: 1.5; }
+
+    /* Input rows */
+    .field-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 14px; margin: 0 -14px;
+      border-radius: 12px; cursor: pointer;
+      transition: background 0.15s, box-shadow 0.15s;
+      border: 2px solid transparent;
+    }
+    .field-row:hover { background: #f8faf5; }
+    .field-row.focused {
+      background: #f0f7ec; border-color: #3a6b35;
+      box-shadow: 0 2px 12px rgba(58,107,53,0.08);
+    }
+    .field-row + .field-row { margin-top: 2px; }
+    .field-label {
+      flex: 1; font-size: 14px; color: #2d4a2d; font-weight: 500; line-height: 1.3;
+    }
+    .field-input-group { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .field-input-group input[type="number"] {
+      padding: 8px 10px; border-radius: 8px; border: 1.5px solid #d4e4cc;
+      font-size: 16px; font-weight: 600; color: #1a2e1a; width: 100px;
+      outline: none; transition: border 0.2s; background: white; text-align: right;
+    }
+    .field-input-group input[type="number"]:focus { border-color: #3a6b35; }
+    .field-unit { font-size: 12px; color: #8a9a8a; white-space: nowrap; min-width: 60px; }
+
+    /* Toggle */
+    .toggle-group { display: flex; gap: 4px; }
+    .toggle-opt {
+      padding: 7px 16px; border-radius: 8px; border: 1.5px solid #d4e4cc;
+      font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s;
+      background: white; color: #8a9a8a;
+    }
+    .toggle-opt.on { border-color: #3a6b35; background: #3a6b35; color: white; }
+
+    /* Info panel (slides in below focused field) */
+    .field-info {
+      margin: 6px 0 8px 0; padding: 12px 16px;
+      background: #f8faf5; border-radius: 10px; border: 1px solid #e0edd8;
+      font-size: 13px; color: #3a5a3a; line-height: 1.6;
+      animation: infoIn 0.2s ease;
+    }
+    @keyframes infoIn {
+      from { opacity: 0; max-height: 0; padding: 0 16px; margin: 0; }
+      to { opacity: 1; max-height: 200px; }
+    }
+
+    /* Section divider within card */
+    .section-divider {
+      font-size: 11px; font-weight: 700; color: #3a6b35; letter-spacing: 0.5px;
+      margin: 16px 0 6px 0; padding-top: 12px; border-top: 1.5px solid #e8f0e0;
+      text-transform: uppercase;
+    }
+    .section-divider:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+
+    /* Summary row */
+    .summary-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 16px; margin-top: 12px;
+      background: #f0f7ec; border-radius: 10px; border: 1px solid #d4e4cc;
+    }
+    .summary-row .s-label { font-size: 14px; color: #2d4a2d; font-weight: 600; }
+    .summary-row .s-value { font-size: 18px; font-weight: 700; color: #1a2e1a; }
+
+    /* Navigation */
+    .nav {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: 16px; gap: 12px;
+    }
+    .nav-btn {
+      padding: 14px 28px; border-radius: 12px; font-weight: 600; font-size: 15px;
+      cursor: pointer; transition: all 0.2s; border: none;
+    }
+    .nav-btn.prev { background: white; color: #3a6b35; border: 2px solid #3a6b35; }
+    .nav-btn.prev:hover { background: #f0f7ec; }
+    .nav-btn.next { background: #3a6b35; color: white; }
+    .nav-btn.next:hover { background: #2d5429; }
+    .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .mini-result { text-align: center; padding: 4px 0; flex-shrink: 0; }
+    .mini-result .mini-label { font-size: 10px; color: #6b8a6b; }
+    .mini-result .mini-value { font-size: 18px; font-weight: 700; }
+    .mini-result .mini-value.pos { color: #3a6b35; }
+    .mini-result .mini-value.neg { color: #dc2626; }
+
+    /* ===== RESULTS ===== */
+    .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .result-grid-sm { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+    .result-card {
+      border-radius: 12px; padding: 14px 18px; display: flex; flex-direction: column; gap: 4px;
+      border: 1px solid #d4e4cc; background: #f0f7ec;
+    }
+    .result-card.big { padding: 20px 24px; border: 2px solid #3a6b35; }
+    .result-card.positive { background: #e8f5e0; }
+    .result-card.negative { background: #fde8e8; }
+    .result-card.cost { background: #fff5f5; }
+    .rc-label { font-size: 12px; color: #5a7a5a; font-weight: 500; }
+    .result-card.big .rc-label { font-size: 13px; }
+    .rc-value-row { display: flex; align-items: baseline; gap: 6px; }
+    .rc-value { font-size: 20px; font-weight: 700; color: #1a2e1a; }
+    .result-card.big .rc-value { font-size: 28px; }
+    .rc-unit { font-size: 12px; color: #6b8a6b; }
+    .rc-detail { font-size: 11px; color: #8a9a8a; margin-top: 2px; }
+
+    .breakdown { margin-top: 18px; background: #f8faf5; border-radius: 12px; padding: 16px; border: 1px solid #e0edd8; }
+    .breakdown h3 { font-size: 14px; font-weight: 600; color: #1a2e1a; margin-bottom: 12px; }
+    .breakdown-bar { display: flex; border-radius: 8px; overflow: hidden; height: 28px; }
+    .breakdown-segment { display: flex; align-items: center; justify-content: center; transition: width 0.5s ease; }
+    .breakdown-segment span { font-size: 10px; color: white; font-weight: 600; }
+    .breakdown-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+    .breakdown-legend-item { display: flex; align-items: center; gap: 5px; }
+    .breakdown-legend-item .dot { width: 10px; height: 10px; border-radius: 2px; }
+    .breakdown-legend-item span { font-size: 12px; color: #4a6a4a; }
+
+    .info-box {
+      border-radius: 10px; padding: 14px; margin-top: 16px;
+      background: #fff8ec; border: 1px solid #f0ddb8;
+    }
+    .info-box .info-title { font-size: 12px; font-weight: 600; margin-bottom: 6px; color: #8a7040; }
+    .info-box .info-text { font-size: 13px; line-height: 1.6; color: #5a4a2a; }
+
+    @media (max-width: 480px) {
+      .card { padding: 20px 16px; }
+      .field-row { margin: 0 -6px; padding: 10px 8px; }
+      .field-input-group input[type="number"] { width: 80px; font-size: 15px; }
+      .field-unit { font-size: 11px; min-width: 50px; }
+      .result-grid, .result-grid-sm { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Collie ROI Calculator</h1>
+      <p>Bereken wat virtueel weiden jou oplevert</p>
+    </div>
+    <div class="section-progress" id="sectionProgress"></div>
+    <div class="section-labels" id="sectionLabels"></div>
+    <div id="mainContent"></div>
+    <div class="nav" id="nav"></div>
+  </div>
+
+  <script>
+    // ========== SECTIONS & FIELDS ==========
+    const SECTIONS = [
+      { id: 'farm', title: 'Jouw Bedrijf', icon: '\u{1F3E1}', subtitle: 'We beginnen met de basis. Dit helpt ons jouw situatie goed in te schatten.' },
+      { id: 'grazing', title: 'Beweiding', icon: '\u{1F33F}', subtitle: 'Hoe weidt jouw vee nu? Denk goed na over de daadwerkelijke uren en arbeid.' },
+      { id: 'feed', title: 'Voerrantsoen', icon: '\u{1F33E}', subtitle: 'Wat eet jouw koe per dag tijdens het weideseizoen?' },
+      { id: 'costs', title: 'Kosten & Prijzen', icon: '\u{1F4B0}', subtitle: 'We hebben NL-gemiddelden ingevuld. Pas aan naar jouw werkelijke prijzen.' },
+      { id: 'collie', title: 'Met Collie', icon: '\u{1F415}', subtitle: 'Hoe ziet jouw bedrijf eruit met Collie? Pas de verwachtingen aan naar jouw situatie.' },
+      { id: 'results', title: 'Resultaat', icon: '\u{1F4CA}', subtitle: null },
+    ];
+
+    const FIELDS = {
+      farm: [
+        { key: 'numCows', dataKey: 'farm', label: 'Aantal melkkoeien', unit: 'koeien', step: 1,
+          info: 'Tel alleen je melkgevende koeien mee, niet het jongvee. Het gemiddelde Nederlandse melkveebedrijf heeft ~100 koeien.' },
+        { key: 'milkProduction', dataKey: 'farm', label: 'Melkproductie per koe', unit: 'liter/koe/jaar', step: 100,
+          info: 'Jouw rollend jaargemiddelde. Het NL gemiddelde ligt rond 9.000 liter/koe/jaar. Check je MPR voor het exacte getal.' },
+        { key: 'hasRobot', dataKey: 'farm', label: 'Melkrobot', type: 'toggle',
+          info: 'Met een melkrobot kan Collie extra melkgiften stimuleren doordat koeien vaker naar de robot gaan wanneer ze buitenlopen.' },
+        { key: 'hectaresGrass', dataKey: 'farm', label: 'Hectares grasland beweiding', unit: 'ha', step: 1,
+          info: 'Alleen het grasland dat je nu (of straks) voor beweiding gebruikt.' },
+      ],
+      grazing: [
+        { key: 'fullDaysOut', dataKey: 'grazing', label: 'Dag-en-nacht weiden', unit: 'dagen/seizoen', step: 1,
+          info: 'Hoeveel dagen staan je koeien 24 uur per dag buiten? Het NL gemiddelde is ~60 dagen voor bedrijven die dit doen.' },
+        { key: 'halfDaysOut', dataKey: 'grazing', label: 'Halve dagen weiden', unit: 'dagen/seizoen', step: 1,
+          info: 'Overdag buiten, \'s nachts binnen. Dit is het meest voorkomende systeem in NL (~85% van de weideweken).' },
+        { key: 'totalGrazingHours', dataKey: 'grazing', label: 'Totaal weide-uren per jaar', unit: 'uren', step: 10,
+          info: 'Totale uren beweiding. NL gemiddelde rond 1.500-1.800 uur. Bij dag-en-nacht grazen: ~24\u00D7dagen. Bij halve dagen: ~7-10\u00D7dagen.' },
+        { key: 'grazingLabourHours', dataKey: 'grazing', label: 'Beweiding arbeid', unit: 'uur/dag', step: 0.25,
+          info: 'Hoeveel tijd besteed je dagelijks aan beweidingsmanagement? Denk ook aan: draden verleggen, koeien ophalen, gras beoordelen, hekken open/dicht.' },
+        { key: 'stallLabourHours', dataKey: 'grazing', label: 'Extra stal-arbeid zonder weidegang', unit: 'uur/dag', step: 0.25,
+          info: 'Hoeveel extra werk heb je in de stal op dagen dat de koeien niet buiten staan? Denk aan: ligboxen schoonmaken en instrooien, extra voeren, mest schuiven, etc. Dit is arbeid die je bespaart op weidedagen.' },
+        { key: 'milkingsPerDay', dataKey: 'grazing', label: 'Melkingen per koe per dag', unit: 'melkingen', dynamicStep: true },
+      ],
+      feed: [
+        { key: 'grassIntake', dataKey: 'feed', label: 'Weidegras opname', unit: 'kg DS/koe/dag', step: 0.5,
+          info: 'Hoeveel vers gras nemen je koeien op in de wei? Bij beperkt weiden vaak 3-6 kg DS, bij dag-en-nacht 10-16 kg DS.' },
+        { key: 'concentrateIntake', dataKey: 'feed', label: 'Krachtvoer opname', unit: 'kg DS/koe/dag', step: 0.5,
+          info: 'NL gemiddelde: ~5 kg/dag. Inclusief brok, meel en korrels.' },
+        { key: 'byproductIntake', dataKey: 'feed', label: 'Bijproducten opname', unit: 'kg DS/koe/dag', step: 0.5,
+          info: 'Bijv. bierbostel, citruspulp, sojaschroot, etc.' },
+        { key: 'grassSilageIntake', dataKey: 'feed', label: 'Graskuil opname', unit: 'kg DS/koe/dag', step: 0.5,
+          info: 'Bij volledig weiden kan dit 0 zijn, bij beperkt weiden vaak 5-8 kg DS.' },
+        { key: 'maizeSilageIntake', dataKey: 'feed', label: 'Maiskuil opname', unit: 'kg DS/koe/dag', step: 0.5,
+          info: 'Vaak 0-4 kg DS afhankelijk van rantsoenopbouw.' },
+      ],
+      costs: [
+        { key: 'milkPrice', dataKey: 'market', label: 'Melkprijs', unit: '\u20AC/liter', step: 0.01,
+          info: 'Jouw uitbetaalprijs per liter melk. NL gemiddelde schommelt rond \u20AC0.45-0.55.' },
+        { key: 'concentratePrice', dataKey: 'market', label: 'Krachtvoer prijs', unit: '\u20AC/kg DS', step: 0.01,
+          info: 'Prijs per kg droge stof krachtvoer. NL gemiddelde ~\u20AC0.34/kg DS.' },
+        { key: 'byproductPrice', dataKey: 'market', label: 'Bijproducten prijs', unit: '\u20AC/kg DS', step: 0.01,
+          info: 'Gemiddelde prijs van je bijproducten (bierbostel, pulp, etc.).' },
+        { key: 'litterCost', dataKey: 'market', label: 'Strooisel kosten', unit: '\u20AC/dag', step: 1,
+          info: 'Als koeien meer buiten staan, bespaar je op strooisel/ligboxbedekking.' },
+        { key: 'manureSpreadCost', dataKey: 'market', label: 'Mestuitrijden kosten', unit: '\u20AC/m\u00B3', step: 0.5,
+          info: 'Wat betaal je de loonwerker per kuub mest uitrijden? Gemiddeld \u20AC3/m\u00B3.' },
+        { key: 'labourCost', dataKey: 'market', label: 'Arbeid waarde', unit: '\u20AC/uur', step: 1,
+          info: 'Wat is een uur van jouw tijd waard? Als je een werknemer moest inhuren, wat zou dat kosten?' },
+      ],
+      collie: [
+        { key: 'newFullDaysOut', dataKey: 'collie', label: 'Dag-en-nacht weiden', unit: 'dagen', step: 1, group: 'Beweiding',
+          info: 'Met virtuele hekken heb je geen fysieke draden meer nodig, waardoor dag-en-nacht weiden makkelijker wordt.' },
+        { key: 'newHalfDaysOut', dataKey: 'collie', label: 'Halve dagen weiden', unit: 'dagen', step: 1, group: 'Beweiding' },
+        { key: 'newTotalGrazingHours', dataKey: 'collie', label: 'Totaal weide-uren', unit: 'uren', step: 10, group: 'Beweiding' },
+        { key: 'newGrazingLabour', dataKey: 'collie', label: 'Beweiding arbeid', unit: 'uur/dag', step: 0.1, group: 'Arbeid',
+          info: 'Met Collie beweeg je je koeien vanuit de app. Geen draden meer verleggen, geen koeien ophalen. Gemiddeld 5-10 minuten per dag.' },
+        { key: 'newStallLabour', dataKey: 'collie', label: 'Stal-arbeid', unit: 'uur/dag', step: 0.25, group: 'Arbeid' },
+        { key: 'newGrassIntake', dataKey: 'collie', label: 'Weidegras opname', unit: 'kg DS/dag', step: 0.5, group: 'Voer (zomer)',
+          info: 'Door meer en beter weiden neemt de grasopname flink toe. Stripgrazen met Collie optimaliseert grasbenutting.' },
+        { key: 'newConcentrateIntake', dataKey: 'collie', label: 'Krachtvoer opname', unit: 'kg DS/dag', step: 0.5, group: 'Voer (zomer)',
+          info: 'Meer vers gras = minder krachtvoer nodig.' },
+        { key: 'newByproductIntake', dataKey: 'collie', label: 'Bijproducten opname', unit: 'kg DS/dag', step: 0.5, group: 'Voer (zomer)' },
+        { key: 'newGrassSilageIntake', dataKey: 'collie', label: 'Graskuil opname', unit: 'kg DS/dag', step: 0.5, group: 'Voer (zomer)',
+          info: 'Minder bijvoeren in de zomer! Door langere en betere beweiding heb je minder kuil nodig.' },
+        { key: 'newMaizeSilageIntake', dataKey: 'collie', label: 'Maiskuil opname', unit: 'kg DS/dag', step: 0.5, group: 'Voer (zomer)' },
+      ],
+    };
+
+    // ========== STATE ==========
+    let currentSection = 0; // index into SECTIONS
+    let focusedField = null; // 'dataKey.key' or null
+
+    const state = {
+      market: {
+        collarPrice: 90, milkPrice: 0.48, concentratePrice: 0.35, byproductPrice: 0.25,
+        litterCost: 5, manureSpreadCost: 3, labourCost: 35, grassCostField: 0.08,
+        silageCost: 0.18, urineProduction: 17, manureProduction: 71.23,
+        grassConversion: 1.64, extraGrassGrowth: 0.15, extraMilkFactor: 0.15, nedapCost: 15,
+      },
+      farm: {
+        numCows: 0, milkProduction: 0, hectaresGrass: 0,
+        hectaresNature: 0, hectaresTotal: 0, hectaresMaize: 0, hasRobot: false,
+      },
+      grazing: {
+        fullDaysOut: 60, halfDaysOut: 140, grazingLabourHours: 1.5,
+        stallLabourHours: 1.5, milkingsPerDay: 2, totalGrazingHours: 1800,
+      },
+      feed: {
+        grassIntake: 10, concentrateIntake: 5, byproductIntake: 0,
+        grassSilageIntake: 7, maizeSilageIntake: 0,
+      },
+      collie: {
+        newGrazingLabour: 0.1, newStallLabour: 0.5, newMilkings: 2.3,
+        newGrassIntake: 13, newConcentrateIntake: 4, newByproductIntake: 0,
+        newGrassSilageIntake: 5, newMaizeSilageIntake: 0,
+        newFullDaysOut: 100, newHalfDaysOut: 100, newTotalGrazingHours: 2500,
+        newMilkProduction: 0,
+      },
+    };
+
+    // ========== HELPERS ==========
+    function formatEuro(val) {
+      if (val === null || val === undefined || isNaN(val)) return '\u20AC 0';
+      const abs = Math.abs(Math.round(val));
+      const formatted = abs.toLocaleString('nl-NL');
+      return val < 0 ? `-\u20AC ${formatted}` : `\u20AC ${formatted}`;
+    }
+    function formatNum(val, dec = 0) {
+      if (val === null || val === undefined || isNaN(val)) return '0';
+      return Number(val).toLocaleString('nl-NL', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+    }
+
+    function getCollarPrice(numCows) {
+      // Basis: €400 halsband (over 8 jaar = €50/jr) + €40 service = €90/koe/jaar
+      // Staffelkorting alleen op halsband (€50/jr gedeelte)
+      const collarPerYear = 50; // €400 / 8 jaar
+      const servicePerYear = 40;
+      let discount = 0;
+      if (numCows >= 500) discount = 0.15;
+      else if (numCows >= 200) discount = 0.10;
+      else if (numCows >= 100) discount = 0.05;
+      return collarPerYear * (1 - discount) + servicePerYear;
+    }
+
+    function calculate() {
+      const { farm, grazing, feed, market, collie } = state;
+      const collarPrice = getCollarPrice(farm.numCows);
+      const grazingDaysWithCollie = collie.newFullDaysOut + collie.newHalfDaysOut / 2;
+
+      const labourSavingHoursPerDay = (grazing.grazingLabourHours + grazing.stallLabourHours / 7)
+        - (collie.newGrazingLabour + collie.newStallLabour / 7);
+      const labourSavingHours = labourSavingHoursPerDay * (grazing.fullDaysOut + grazing.halfDaysOut);
+      const labourSaving = labourSavingHours * market.labourCost;
+
+      const milkingChange = collie.newMilkings - grazing.milkingsPerDay;
+      const extraMilkPerCowDay = farm.milkProduction * market.extraMilkFactor * milkingChange / 365;
+      const extraMilkLitres = extraMilkPerCowDay * farm.numCows * grazingDaysWithCollie
+        + (collie.newMilkProduction - farm.milkProduction) * farm.numCows;
+      const milkSaving = extraMilkLitres * market.milkPrice;
+
+      const concentrateSaved = (feed.concentrateIntake - collie.newConcentrateIntake) * grazingDaysWithCollie * farm.numCows;
+      const concentrateSaving = market.concentratePrice * concentrateSaved;
+      const byproductSaved = (feed.byproductIntake - collie.newByproductIntake) * grazingDaysWithCollie * farm.numCows;
+      const byproductSaving = market.byproductPrice * byproductSaved;
+      const silageSaved = (feed.grassSilageIntake - collie.newGrassSilageIntake) * farm.numCows * grazingDaysWithCollie;
+      const silageSaving = silageSaved * (market.silageCost - market.grassCostField);
+      const litterSaving = market.litterCost * grazingDaysWithCollie;
+
+      const totalExcretionPerCowPerDay = market.urineProduction + market.manureProduction;
+      const hoursInYear = 8760;
+      const manureInsideCurrent = ((totalExcretionPerCowPerDay / 24) * (hoursInYear - grazing.totalGrazingHours) * farm.numCows) / 1000;
+      const manureInsideCollie = ((totalExcretionPerCowPerDay / 24) * (hoursInYear - collie.newTotalGrazingHours) * farm.numCows) / 1000;
+      const manureSaved = manureInsideCurrent - manureInsideCollie;
+      const manureSaving = manureSaved * market.manureSpreadCost;
+
+      const grossBenefit = labourSaving + milkSaving + concentrateSaving + byproductSaving + silageSaving + litterSaving + manureSaving;
+      const collarCost = collarPrice * farm.numCows;
+      const netBenefit = grossBenefit - collarCost;
+      const netPerCow = farm.numCows > 0 ? netBenefit / farm.numCows : 0;
+
+      return {
+        labourSavingHours, labourSaving, extraMilkLitres, milkSaving,
+        concentrateSaved, concentrateSaving, byproductSaved, byproductSaving,
+        silageSaved, silageSaving, litterSaving, manureSaved, manureSaving,
+        grossBenefit, collarCost, collarPrice, netBenefit, netPerCow, grazingDaysWithCollie,
+      };
+    }
+
+    // ========== FIELD RENDERING ==========
+    function updateField(dataKey, key, value) {
+      state[dataKey][key] = value;
+      if (dataKey === 'farm' && key === 'hectaresGrass')
+        state.farm.hectaresTotal = state.farm.hectaresGrass + state.farm.hectaresNature;
+      if (dataKey === 'farm' && key === 'hectaresNature')
+        state.farm.hectaresTotal = state.farm.hectaresGrass + state.farm.hectaresNature;
+      if (dataKey === 'farm' && key === 'milkProduction')
+        state.collie.newMilkProduction = value;
+      if (dataKey === 'farm' && key === 'hasRobot') {
+        state.grazing.milkingsPerDay = value ? 2.3 : 2;
+        state.collie.newMilkings = value ? 2.3 : 2;
+      }
+      updateSummaryRows();
+      updateNav();
+    }
+
+    function updateSummaryRows() {
+      const el = document.querySelector('.summary-row .s-value');
+      if (!el) return;
+      const secId = SECTIONS[currentSection].id;
+      if (secId === 'feed') {
+        const { feed } = state;
+        const total = feed.grassIntake + feed.concentrateIntake + feed.byproductIntake + feed.grassSilageIntake + feed.maizeSilageIntake;
+        el.textContent = `${formatNum(total, 1)} kg DS/dag`;
+      }
+      if (secId === 'collie') {
+        const { collie } = state;
+        const total = collie.newGrassIntake + collie.newConcentrateIntake + collie.newByproductIntake + collie.newGrassSilageIntake + collie.newMaizeSilageIntake;
+        el.textContent = `${formatNum(total, 1)} kg DS/dag`;
+      }
+    }
+
+    function setFocus(fieldId) {
+      if (focusedField === fieldId) return;
+      focusedField = fieldId;
+      // Update visual state without full re-render (keeps input focus)
+      document.querySelectorAll('.field-row').forEach(row => {
+        const id = row.dataset.fieldId;
+        row.classList.toggle('focused', id === fieldId);
+      });
+      // Show/hide info panels
+      document.querySelectorAll('.field-info').forEach(el => el.remove());
+      if (fieldId) {
+        const row = document.querySelector(`.field-row[data-field-id="${fieldId}"]`);
+        if (row) {
+          const secId = SECTIONS[currentSection].id;
+          const field = FIELDS[secId]?.find(f => `${f.dataKey}.${f.key}` === fieldId);
+          if (field?.info) {
+            const infoEl = document.createElement('div');
+            infoEl.className = 'field-info';
+            infoEl.textContent = field.info;
+            row.after(infoEl);
+            requestAnimationFrame(() => infoEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+          }
+        }
+      }
+    }
+
+    function renderFieldRow(field) {
+      const val = state[field.dataKey][field.key];
+      const fieldId = `${field.dataKey}.${field.key}`;
+      const isFocused = focusedField === fieldId;
+
+      let inputHTML;
+      if (field.type === 'toggle') {
+        inputHTML = `<div class="toggle-group">
+          <div class="toggle-opt ${!val ? 'on' : ''}" onclick="event.stopPropagation();updateField('${field.dataKey}','${field.key}',false);render()">Nee</div>
+          <div class="toggle-opt ${val ? 'on' : ''}" onclick="event.stopPropagation();updateField('${field.dataKey}','${field.key}',true);render()">Ja</div>
+        </div>`;
+      } else {
+        let step = field.step || 1;
+        if (field.dynamicStep) step = state.farm.hasRobot ? 0.1 : 1;
+        inputHTML = `<div class="field-input-group">
+          <input type="number" value="${val}" step="${step}"
+            onclick="event.stopPropagation()"
+            onfocus="setFocus('${fieldId}');var inp=this;setTimeout(function(){inp.select()},20)"
+            oninput="updateField('${field.dataKey}','${field.key}',Number(this.value))">
+          ${field.unit ? `<span class="field-unit">${field.unit}</span>` : ''}
+        </div>`;
+      }
+
+      return `<div class="field-row ${isFocused ? 'focused' : ''}" data-field-id="${fieldId}"
+        onclick="setFocus('${fieldId}')">
+        <span class="field-label">${field.label}</span>
+        ${inputHTML}
+      </div>${isFocused && field.info ? `<div class="field-info">${field.info}</div>` : ''}`;
+    }
+
+    function renderSectionFields(secId) {
+      const fields = FIELDS[secId];
+      if (!fields) return '';
+
+      let html = '';
+      let lastGroup = null;
+      fields.forEach(f => {
+        if (f.group && f.group !== lastGroup) {
+          html += `<div class="section-divider">${f.group}</div>`;
+          lastGroup = f.group;
+        }
+        html += renderFieldRow(f);
+      });
+
+      // Summary rows
+      if (secId === 'feed') {
+        const { feed } = state;
+        const total = feed.grassIntake + feed.concentrateIntake + feed.byproductIntake + feed.grassSilageIntake + feed.maizeSilageIntake;
+        html += `<div class="summary-row">
+          <span class="s-label">Totale opname zomer</span>
+          <span class="s-value">${formatNum(total, 1)} kg DS/dag</span>
+        </div>`;
+      }
+      if (secId === 'collie') {
+        const { collie } = state;
+        const total = collie.newGrassIntake + collie.newConcentrateIntake + collie.newByproductIntake + collie.newGrassSilageIntake + collie.newMaizeSilageIntake;
+        html += `<div class="summary-row">
+          <span class="s-label">Nieuwe totale opname</span>
+          <span class="s-value">${formatNum(total, 1)} kg DS/dag</span>
+        </div>`;
+      }
+
+      return html;
+    }
+
+    // ========== RESULTS ==========
+    function renderResults() {
+      const calc = calculate();
+      const { market, farm } = state;
+      const items = [
+        { label: 'Arbeid', value: calc.labourSaving, color: '#3a6b35' },
+        { label: 'Melk', value: calc.milkSaving, color: '#5a9a55' },
+        { label: 'Krachtvoer', value: calc.concentrateSaving, color: '#7abb75' },
+        { label: 'Bijproducten', value: calc.byproductSaving, color: '#9ad495' },
+        { label: 'Kuil', value: calc.silageSaving, color: '#f59e0b' },
+        { label: 'Strooisel', value: calc.litterSaving, color: '#d97706' },
+        { label: 'Mest', value: calc.manureSaving, color: '#8b6914' },
+      ];
+      const pos = items.filter(i => i.value > 0);
+
+      let barHTML = '', legendHTML = '';
+      pos.forEach(item => {
+        const pct = calc.grossBenefit > 0 ? (item.value / calc.grossBenefit) * 100 : 0;
+        if (pct >= 1) barHTML += `<div class="breakdown-segment" style="width:${pct}%;background:${item.color}">${pct > 8 ? `<span>${Math.round(pct)}%</span>` : ''}</div>`;
+        legendHTML += `<div class="breakdown-legend-item"><div class="dot" style="background:${item.color}"></div><span>${item.label}: ${formatEuro(item.value)}</span></div>`;
+      });
+
+      function rc(label, value, unit, extra) {
+        extra = extra || {};
+        return `<div class="result-card ${extra.big?'big':''} ${extra.cls||''}">
+          <div class="rc-label">${label}</div>
+          <div class="rc-value-row"><span class="rc-value">${value}</span>${unit?`<span class="rc-unit">${unit}</span>`:''}</div>
+          ${extra.detail?`<div class="rc-detail">${extra.detail}</div>`:''}
+        </div>`;
+      }
+
+      return `<div class="result-grid">
+          ${rc('Netto rendement', formatEuro(calc.netBenefit), '/jaar', { big: true, cls: calc.netBenefit >= 0 ? 'positive' : 'negative' })}
+          ${rc('Per koe', formatEuro(calc.netPerCow), '/koe/jaar', { big: true, cls: calc.netPerCow >= 0 ? 'positive' : 'negative' })}
+        </div>
+        <div class="breakdown">
+          <h3>Opbouw besparingen</h3>
+          <div class="breakdown-bar">${barHTML}</div>
+          <div class="breakdown-legend">${legendHTML}</div>
+        </div>
+        <div class="result-grid-sm">
+          ${rc('Arbeidsbesparing', formatEuro(calc.labourSaving), '', { detail: `${formatNum(calc.labourSavingHours, 0)} uur \u00D7 \u20AC${market.labourCost}/uur` })}
+          ${rc('Extra melkopbrengst', formatEuro(calc.milkSaving), '', { detail: `${formatNum(calc.extraMilkLitres, 0)} liter \u00D7 \u20AC${market.milkPrice}/liter` })}
+          ${rc('Krachtvoer besparing', formatEuro(calc.concentrateSaving), '', { detail: `${formatNum(calc.concentrateSaved, 0)} kg DS bespaard` })}
+          ${rc('Kuilvoer besparing', formatEuro(calc.silageSaving), '', { detail: 'Minder graskuil door meer vers gras' })}
+          ${rc('Mestbesparing', formatEuro(calc.manureSaving), '', { detail: `${formatNum(calc.manureSaved, 0)} m\u00B3 minder uitrijden` })}
+          ${rc('Strooisel besparing', formatEuro(calc.litterSaving), '', { detail: 'Meer buiten = minder strooisel' })}
+        </div>
+        <div class="result-grid-sm">
+          ${rc('Bruto baten', formatEuro(calc.grossBenefit), '/jaar')}
+          ${rc('Collie kosten', formatEuro(-calc.collarCost), '/jaar', { cls: 'cost', detail: `${farm.numCows} koeien \u00D7 \u20AC${calc.collarPrice}/koe/jaar` })}
+        </div>
+        <div class="info-box" style="margin-top:16px">
+          <div class="info-title">\u{1F4A1} NIET MEEGETELD</div>
+          <div class="info-text">Deze berekening telt nog <strong>niet</strong> mee: besparing op fysiek hekwerk & onderhoud,
+            waarde van gezondheidsdata, flexibiliteit in perceelbeheer, en het gemak van beweiding op afstand.</div>
+        </div>`;
+    }
+
+    // ========== NAV ==========
+    function goToSection(idx) {
+      currentSection = Math.max(0, Math.min(SECTIONS.length - 1, idx));
+      focusedField = null;
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function updateNav() {
+      const isFirst = currentSection === 0;
+      const isLast = currentSection === SECTIONS.length - 1;
+
+      let nextLabel = 'Volgende \u2192';
+      if (currentSection === SECTIONS.length - 2) nextLabel = 'Bekijk resultaat \u2192';
+
+      document.getElementById('nav').innerHTML = `
+        <button class="nav-btn prev" ${isFirst ? 'disabled' : ''} onclick="goToSection(${currentSection - 1})">\u2190 Vorige</button>
+        <button class="nav-btn next" ${isLast ? 'disabled' : ''} onclick="goToSection(${currentSection + 1})">${nextLabel}</button>
+      `;
+    }
+
+    // ========== MAIN RENDER ==========
+    function render() {
+      const sec = SECTIONS[currentSection];
+
+      // Progress bar
+      document.getElementById('sectionProgress').innerHTML = SECTIONS.map((s, i) => {
+        let cls = 'section-dot ';
+        if (i < currentSection) cls += 'done';
+        else if (i === currentSection) cls += 'active';
+        else cls += 'future';
+        return `<div class="${cls}" onclick="goToSection(${i})"></div>`;
+      }).join('');
+
+      // Labels
+      document.getElementById('sectionLabels').innerHTML = SECTIONS.map((s, i) => {
+        return `<span class="${i === currentSection ? 'active' : ''}" onclick="goToSection(${i})">${s.icon} ${s.title}</span>`;
+      }).join('');
+
+      // Content
+      const main = document.getElementById('mainContent');
+      if (sec.id === 'results') {
+        main.innerHTML = `<div class="card" style="animation:cardIn 0.3s ease">
+          <h2>${sec.icon} Jouw Collie ROI</h2>
+          <p class="subtitle">Op basis van jouw gegevens verwachten we de volgende besparingen en opbrengsten per jaar.</p>
+          ${renderResults()}
+        </div>`;
+      } else {
+        main.innerHTML = `<div class="card">
+          <h2>${sec.icon} ${sec.title}</h2>
+          <p class="subtitle">${sec.subtitle}</p>
+          ${renderSectionFields(sec.id)}
+        </div>`;
+      }
+
+      updateNav();
+    }
+
+    // Click outside fields to deselect
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.field-row') && !e.target.closest('.field-info') && !e.target.closest('.toggle-group')) {
+        if (focusedField) setFocus(null);
+      }
+    });
+
+    // Init
+    render();
+  </script>
+</body>
+</html>

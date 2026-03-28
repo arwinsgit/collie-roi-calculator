@@ -1,0 +1,1236 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Collie ROI Calculator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --collie-lime: #CDDC7F;
+      --collie-lime-light: #E3EAAB;
+      --collie-lime-dark: #B8C96B;
+      --collie-teal: #87B8A1;
+      --collie-teal-light: #E8F4EF;
+      --collie-navy: #152435;
+      --collie-navy-light: #2A3F58;
+      --collie-white: #FFFFFF;
+      --collie-bone: #FDF0FD;
+      --collie-off-white: #F4F0ED;
+      --font-heading: 'Montserrat', sans-serif;
+      --font-body: 'Poppins', sans-serif;
+      --bg-dashboard: linear-gradient(170deg, var(--collie-bone) 0%, var(--collie-off-white) 50%, #FEFCFA 100%);
+      --bg-card: #FFFFFF;
+      --bg-field-hover: #FAFAF8;
+      --bg-field-focused: #F8FBEF;
+      --border-field: #E5E5E0;
+      --border-field-focused: var(--collie-lime);
+      --chart-labor: var(--collie-lime);
+      --chart-milk: var(--collie-teal);
+      --chart-feed: #E3EAAB;
+      --chart-silage: #D4A574;
+      --chart-litter: #C4956F;
+      --chart-manure: #8B7355;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      background: var(--bg-dashboard);
+      display: flex;
+      justify-content: center;
+      padding: 24px 16px;
+      font-family: var(--font-body);
+      color: var(--collie-navy);
+    }
+
+    .container { max-width: 600px; width: 100%; }
+
+    /* Header */
+    .header { text-align: center; margin-bottom: 24px; }
+    .header-logo {
+      font-family: var(--font-heading);
+      font-size: 32px; font-weight: 800;
+      color: var(--collie-navy);
+      letter-spacing: -1px;
+    }
+    .header-logo span { color: var(--collie-teal); }
+    .header p { font-size: 14px; color: rgba(21,36,53,0.5); margin-top: 4px; font-weight: 500; }
+
+    /* Progress bar */
+    .progress-bar { display: flex; gap: 4px; margin-bottom: 6px; }
+    .progress-dot {
+      flex: 1; height: 6px; border-radius: 3px;
+      transition: background 0.3s; cursor: pointer;
+    }
+    .progress-dot.done { background: var(--collie-teal); }
+    .progress-dot.active { background: var(--collie-lime); }
+    .progress-dot.future { background: rgba(21,36,53,0.1); }
+
+    .progress-labels {
+      display: flex; justify-content: space-between; margin-bottom: 16px;
+      font-size: 11px; color: rgba(21,36,53,0.4); font-weight: 500;
+    }
+    .progress-labels span { cursor: pointer; transition: color 0.2s; }
+    .progress-labels span.active { color: var(--collie-navy); font-weight: 700; }
+
+    /* Card */
+    .card {
+      background: var(--bg-card);
+      border-radius: 20px;
+      padding: 28px 24px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.06);
+      animation: cardIn 0.3s ease;
+    }
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .card h2 {
+      font-family: var(--font-heading);
+      font-size: 22px; color: var(--collie-navy);
+      margin-bottom: 4px; font-weight: 700;
+    }
+    .card .subtitle {
+      font-size: 13px; color: rgba(21,36,53,0.5);
+      margin-bottom: 20px; line-height: 1.5;
+    }
+
+    /* Field rows */
+    .field-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 14px; margin: 0 -14px;
+      border-radius: 12px; cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      border: 2px solid transparent;
+    }
+    .field-row:hover { background: var(--bg-field-hover); }
+    .field-row.focused {
+      background: var(--bg-field-focused);
+      border-color: var(--collie-lime);
+    }
+    .field-row.readonly {
+      opacity: 0.5; cursor: not-allowed;
+    }
+    .field-row + .field-row { margin-top: 2px; }
+    .field-label {
+      flex: 1; font-size: 14px; color: var(--collie-navy);
+      font-weight: 500; line-height: 1.3;
+    }
+    .field-input-group { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .field-input-group input[type="number"] {
+      padding: 8px 10px; border-radius: 8px;
+      border: 1.5px solid var(--border-field);
+      font-size: 16px; font-weight: 600;
+      color: var(--collie-navy); width: 100px;
+      outline: none; transition: border 0.2s;
+      background: white; text-align: right;
+      font-family: var(--font-body);
+    }
+    .field-input-group input[type="number"]:focus {
+      border-color: var(--collie-lime-dark);
+    }
+    .field-input-group input[type="number"]:read-only {
+      background: #f5f5f5; color: rgba(21,36,53,0.4);
+      cursor: not-allowed;
+    }
+    .field-unit {
+      font-size: 12px; color: rgba(21,36,53,0.4);
+      white-space: nowrap; min-width: 60px;
+    }
+
+    /* Toggle */
+    .toggle-group { display: flex; gap: 4px; }
+    .toggle-opt {
+      padding: 7px 16px; border-radius: 8px;
+      border: 1.5px solid var(--border-field);
+      font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: all 0.15s;
+      background: white; color: rgba(21,36,53,0.4);
+      font-family: var(--font-body);
+    }
+    .toggle-opt.on {
+      border-color: var(--collie-lime-dark);
+      background: var(--collie-lime);
+      color: var(--collie-navy);
+    }
+
+    /* Info tooltip */
+    .field-info {
+      margin: 6px 0 8px 0; padding: 12px 16px;
+      background: var(--bg-field-focused); border-radius: 10px;
+      border: 1px solid var(--collie-lime-light);
+      font-size: 13px; color: var(--collie-navy); line-height: 1.6;
+      animation: infoIn 0.2s ease;
+    }
+    @keyframes infoIn {
+      from { opacity: 0; max-height: 0; }
+      to { opacity: 1; max-height: 200px; }
+    }
+
+    /* Section divider */
+    .section-divider {
+      font-family: var(--font-heading);
+      font-size: 11px; font-weight: 700;
+      color: var(--collie-teal);
+      letter-spacing: 0.5px; text-transform: uppercase;
+      margin: 16px 0 6px 0;
+      padding-top: 12px;
+      border-top: 1.5px solid rgba(21,36,53,0.08);
+    }
+    .section-divider:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+
+    /* Comparison table headers */
+    .compare-header {
+      display: grid; grid-template-columns: 1fr 100px 100px;
+      gap: 10px; padding: 8px 14px; margin: 0 -14px 4px;
+      font-size: 12px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .compare-header .col-nu {
+      text-align: right; color: var(--collie-teal);
+      background: var(--collie-teal-light);
+      padding: 6px 10px; border-radius: 8px;
+    }
+    .compare-header .col-collie {
+      text-align: right; color: var(--collie-navy);
+      background: var(--collie-lime-light);
+      padding: 6px 10px; border-radius: 8px;
+    }
+
+    .compare-row {
+      display: grid; grid-template-columns: 1fr 100px 100px;
+      gap: 10px; align-items: center;
+      padding: 10px 14px; margin: 0 -14px;
+      border-radius: 12px;
+      transition: background 0.15s;
+    }
+    .compare-row:hover { background: var(--bg-field-hover); }
+    .compare-row.readonly { opacity: 0.5; }
+    .compare-row .compare-label {
+      font-size: 13px; font-weight: 500; color: var(--collie-navy);
+    }
+    .compare-row input[type="number"] {
+      padding: 7px 8px; border-radius: 8px;
+      border: 1.5px solid var(--border-field);
+      font-size: 15px; font-weight: 600;
+      color: var(--collie-navy); width: 100%;
+      outline: none; text-align: right;
+      font-family: var(--font-body);
+      background: white;
+    }
+    .compare-row input[type="number"]:focus {
+      border-color: var(--collie-lime-dark);
+    }
+    .compare-row input[type="number"]:read-only {
+      background: #f5f5f5; color: rgba(21,36,53,0.4);
+      cursor: not-allowed;
+    }
+
+    /* Teaser result */
+    .teaser-result {
+      margin-top: 20px; padding: 20px;
+      background: linear-gradient(135deg, var(--collie-teal-light), var(--collie-lime-light));
+      border-radius: 16px; text-align: center;
+      border: 2px solid var(--collie-lime);
+    }
+    .teaser-result .range-label {
+      font-size: 13px; color: var(--collie-navy); font-weight: 600; margin-bottom: 8px;
+    }
+    .teaser-result .range-value {
+      font-family: var(--font-heading);
+      font-size: 26px; font-weight: 800; color: var(--collie-navy);
+    }
+    .teaser-result .range-hint {
+      font-size: 12px; color: rgba(21,36,53,0.5); margin-top: 8px; line-height: 1.5;
+    }
+
+    /* Navigation */
+    .nav {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: 16px; gap: 12px;
+    }
+    .nav-btn {
+      padding: 14px 28px; border-radius: 12px;
+      font-weight: 600; font-size: 15px;
+      cursor: pointer; transition: all 0.2s; border: none;
+      font-family: var(--font-body);
+    }
+    .nav-btn.prev {
+      background: white; color: var(--collie-navy);
+      border: 2px solid var(--collie-navy);
+    }
+    .nav-btn.prev:hover { background: var(--collie-off-white); }
+    .nav-btn.next {
+      background: var(--collie-lime); color: var(--collie-navy);
+      font-weight: 700;
+    }
+    .nav-btn.next:hover { background: var(--collie-lime-dark); }
+    .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .mini-result { text-align: center; flex-shrink: 0; }
+    .mini-result .mini-label { font-size: 10px; color: rgba(21,36,53,0.4); }
+    .mini-result .mini-value {
+      font-family: var(--font-heading);
+      font-size: 18px; font-weight: 700;
+    }
+    .mini-result .mini-value.pos { color: var(--collie-teal); }
+    .mini-result .mini-value.neg { color: #EE4040; }
+
+    /* Results */
+    .result-hero {
+      text-align: center; padding: 24px;
+      background: linear-gradient(135deg, var(--collie-teal-light), var(--collie-lime-light));
+      border-radius: 16px; border: 2px solid var(--collie-lime);
+      margin-bottom: 16px;
+    }
+    .result-hero .hero-label { font-size: 14px; color: var(--collie-navy); font-weight: 600; }
+    .result-hero .hero-value {
+      font-family: var(--font-heading);
+      font-size: 36px; font-weight: 800; color: var(--collie-navy);
+    }
+    .result-hero .hero-sub { font-size: 13px; color: rgba(21,36,53,0.5); margin-top: 4px; }
+
+    .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+    .result-card {
+      border-radius: 12px; padding: 16px;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .result-card.positive { background: var(--collie-teal-light); border: 1px solid var(--collie-teal); }
+    .result-card.cost { background: #FFF5F5; border: 1px solid #EECACA; }
+    .result-card .rc-label { font-size: 12px; color: rgba(21,36,53,0.5); font-weight: 500; }
+    .result-card .rc-value {
+      font-family: var(--font-heading);
+      font-size: 20px; font-weight: 700; color: var(--collie-navy);
+    }
+    .result-card .rc-detail { font-size: 11px; color: rgba(21,36,53,0.4); margin-top: 2px; }
+
+    /* Breakdown bar */
+    .breakdown {
+      margin-top: 20px; background: rgba(21,36,53,0.03);
+      border-radius: 12px; padding: 16px;
+      border: 1px solid rgba(21,36,53,0.06);
+    }
+    .breakdown h3 {
+      font-family: var(--font-heading);
+      font-size: 14px; font-weight: 600; color: var(--collie-navy); margin-bottom: 12px;
+    }
+    .breakdown-bar {
+      display: flex; border-radius: 8px; overflow: hidden; height: 28px;
+    }
+    .breakdown-segment {
+      display: flex; align-items: center; justify-content: center;
+      transition: width 0.5s ease;
+    }
+    .breakdown-segment span { font-size: 10px; color: white; font-weight: 600; }
+    .breakdown-legend {
+      display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;
+    }
+    .breakdown-legend-item { display: flex; align-items: center; gap: 5px; }
+    .breakdown-legend-item .dot { width: 10px; height: 10px; border-radius: 2px; }
+    .breakdown-legend-item span { font-size: 12px; color: var(--collie-navy); }
+
+    /* Disclaimer */
+    .disclaimer {
+      margin-top: 16px; padding: 14px;
+      background: #FFF8EC; border-radius: 10px;
+      border: 1px solid #F0DDB8;
+    }
+    .disclaimer .d-title {
+      font-size: 12px; font-weight: 600; color: #8A7040; margin-bottom: 6px;
+    }
+    .disclaimer .d-text {
+      font-size: 13px; line-height: 1.6; color: #5A4A2A;
+    }
+
+    /* Contact form */
+    .form-field { margin-bottom: 14px; }
+    .form-field label {
+      display: block; font-size: 13px; font-weight: 600;
+      color: var(--collie-navy); margin-bottom: 4px;
+    }
+    .form-field input, .form-field select {
+      width: 100%; padding: 10px 14px; border-radius: 10px;
+      border: 1.5px solid var(--border-field);
+      font-size: 15px; font-family: var(--font-body);
+      color: var(--collie-navy); outline: none;
+      transition: border 0.2s;
+    }
+    .form-field input:focus, .form-field select:focus {
+      border-color: var(--collie-lime-dark);
+    }
+    .form-field .error { border-color: #EE4040; }
+    .form-error { font-size: 11px; color: #EE4040; margin-top: 2px; }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+      .card { padding: 20px 16px; }
+      .field-row { margin: 0 -6px; padding: 10px 8px; }
+      .field-input-group input[type="number"] { width: 80px; font-size: 15px; }
+      .compare-header { grid-template-columns: 1fr 80px 80px; }
+      .compare-row { grid-template-columns: 1fr 80px 80px; }
+      .compare-row input { font-size: 14px; }
+      .result-grid { grid-template-columns: 1fr; }
+      .result-hero .hero-value { font-size: 28px; }
+    }
+
+    /* Hide number input spinners */
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button {
+      -webkit-appearance: none; margin: 0;
+    }
+    input[type="number"] { -moz-appearance: textfield; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-logo">Collie<span>.</span></div>
+      <p>Bereken wat virtueel weiden jou oplevert</p>
+    </div>
+    <div class="progress-bar" id="progressBar"></div>
+    <div class="progress-labels" id="progressLabels"></div>
+    <div id="mainContent"></div>
+    <div class="nav" id="nav"></div>
+  </div>
+
+<script>
+// ============================================================
+// SUPABASE CONFIG (fill in after creating project)
+// ============================================================
+const SUPABASE_URL = '';  // e.g. 'https://xxxxx.supabase.co'
+const SUPABASE_ANON_KEY = '';
+let supabase = null;
+if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+
+// ============================================================
+// SCENARIOS (seed data from briefing)
+// ============================================================
+const SCENARIOS = {
+  conservatief: {
+    weidedagenCollie: 180, urenCollie: 2000,
+    arbeidBeweidingCollieWeide: 0.20, arbeidStalCollieWeide: 0.5,
+    melkproductie: 9000, melkproductieCollie: 9000,
+    melkprijs: 0.40, krachtvoerPrijs: 0.35, bijproductenPrijs: 0.25,
+    arbeidBeweidingNuWeide: 1, arbeidStalNuWeide: 1, arbeidStalNuStal: 2,
+    krachtvoerOpnameNuWeide: 5, bijproductenOpnameNuWeide: 0, maiskuilOpnameNuWeide: 0,
+    krachtvoerOpnameCollieWeide: 5, bijproductenOpnameCollieWeide: 0, maiskuilOpnameCollieWeide: 0,
+    graskuilOpnameNuStal: 15, krachtvoerOpnameNuStal: 5,
+    bijproductenOpnameNuStal: 0, maiskuilOpnameNuStal: 0,
+    strooiselKosten: 5, mestuitrijdenKosten: 3, arbeidWaarde: 35,
+    melkingenNuMelkstal: 2, melkingenNuRobot: 2.3,
+    melkingenCollieMelkstal: 2, melkingenCollieRobot: 2.3,
+  },
+  gemiddeld: {
+    weidedagenCollie: 200, urenCollie: 2500,
+    arbeidBeweidingCollieWeide: 0.15, arbeidStalCollieWeide: 0.5,
+    melkproductie: 9000, melkproductieCollie: 9000,
+    melkprijs: 0.45, krachtvoerPrijs: 0.35, bijproductenPrijs: 0.25,
+    arbeidBeweidingNuWeide: 1, arbeidStalNuWeide: 1, arbeidStalNuStal: 2,
+    krachtvoerOpnameNuWeide: 5, bijproductenOpnameNuWeide: 0, maiskuilOpnameNuWeide: 0,
+    krachtvoerOpnameCollieWeide: 4, bijproductenOpnameCollieWeide: 0, maiskuilOpnameCollieWeide: 0,
+    graskuilOpnameNuStal: 15, krachtvoerOpnameNuStal: 5,
+    bijproductenOpnameNuStal: 0, maiskuilOpnameNuStal: 0,
+    strooiselKosten: 5, mestuitrijdenKosten: 3, arbeidWaarde: 35,
+    melkingenNuMelkstal: 2, melkingenNuRobot: 2.3,
+    melkingenCollieMelkstal: 2, melkingenCollieRobot: 2.3,
+  },
+  optimistisch: {
+    weidedagenCollie: 220, urenCollie: 3000,
+    arbeidBeweidingCollieWeide: 0.10, arbeidStalCollieWeide: 0.5,
+    melkproductie: 9000, melkproductieCollie: 9000,
+    melkprijs: 0.50, krachtvoerPrijs: 0.35, bijproductenPrijs: 0.25,
+    arbeidBeweidingNuWeide: 1, arbeidStalNuWeide: 1, arbeidStalNuStal: 2,
+    krachtvoerOpnameNuWeide: 5, bijproductenOpnameNuWeide: 0, maiskuilOpnameNuWeide: 0,
+    krachtvoerOpnameCollieWeide: 3, bijproductenOpnameCollieWeide: 0, maiskuilOpnameCollieWeide: 0,
+    graskuilOpnameNuStal: 15, krachtvoerOpnameNuStal: 5,
+    bijproductenOpnameNuStal: 0, maiskuilOpnameNuStal: 0,
+    strooiselKosten: 5, mestuitrijdenKosten: 3, arbeidWaarde: 35,
+    melkingenNuMelkstal: 2, melkingenNuRobot: 2.3,
+    melkingenCollieMelkstal: 2, melkingenCollieRobot: 2.3,
+  },
+};
+
+// ============================================================
+// STEPS
+// ============================================================
+const STEPS = [
+  { id: 'teaser', title: 'Start' },
+  { id: 'contact', title: 'Contact' },
+  { id: 'beweiding', title: 'Beweiding' },
+  { id: 'melk', title: 'Melk' },
+  { id: 'voer', title: 'Voer' },
+  { id: 'prijzen', title: 'Prijzen' },
+  { id: 'resultaat', title: 'Resultaat' },
+];
+
+// ============================================================
+// STATE
+// ============================================================
+let currentStep = 0;
+let focusedField = null;
+let leadId = null;
+
+// Teaser inputs (user fills in)
+const teaserInputs = {
+  numCows: null,
+  hectaresAvailable: null,
+  currentGrazingHours: null,
+  currentGrazingDays: null,
+  hasRobot: false,
+};
+
+// Teaser result (range)
+let teaserResult = null;
+
+// Contact form
+const contactData = {
+  naam: '', email: '', bedrijfsnaam: '', telefoon: '', provincie: '',
+};
+
+// Full calculator state (built from gemiddeld scenario + teaser inputs)
+let calcState = null;
+
+// ============================================================
+// CALCULATION ENGINE (exact copy from briefing MD)
+// ============================================================
+function calcGrassIntake(hours, days) {
+  if (!days || !hours) return 0;
+  return Math.ceil((hours / days) * 0.75);
+}
+
+function getCollarPrice(numCows) {
+  const collarPerYear = 50;
+  const servicePerYear = 40;
+  let discount = 0;
+  if (numCows >= 500) discount = 0.15;
+  else if (numCows >= 200) discount = 0.10;
+  else if (numCows >= 100) discount = 0.05;
+  return collarPerYear * (1 - discount) + servicePerYear;
+}
+
+function buildCalculatorState(inputs, scenario) {
+  const { numCows, hectaresAvailable, currentGrazingHours, currentGrazingDays, hasRobot } = inputs;
+
+  const currentGrassIntake = calcGrassIntake(currentGrazingHours, currentGrazingDays);
+  const collieGrassIntake = calcGrassIntake(
+    scenario.urenCollie ?? currentGrazingHours,
+    scenario.weidedagenCollie ?? currentGrazingDays
+  );
+  const currentGrassSilage = Math.max(0, 15 - currentGrassIntake);
+  const collieGrassSilage = Math.max(0, 15 - collieGrassIntake);
+
+  return {
+    farm: {
+      numCows,
+      milkProduction: scenario.melkproductie ?? 9000,
+      hasRobot: hasRobot ?? false,
+      hectaresGrass: hectaresAvailable,
+    },
+    grazing: {
+      totalDays: currentGrazingDays,
+      totalGrazingHours: currentGrazingHours,
+      grazingLabourHours: scenario.arbeidBeweidingNuWeide ?? 1.0,
+      stallLabourHours: scenario.arbeidStalNuWeide ?? 1.0,
+      stallLabourStaldagen: scenario.arbeidStalNuStal ?? 2.0,
+      milkingsPerDay: hasRobot
+        ? (scenario.melkingenNuRobot ?? 2.3)
+        : (scenario.melkingenNuMelkstal ?? 2),
+    },
+    feedGrazing: {
+      grassIntake: currentGrassIntake,
+      concentrateIntake: scenario.krachtvoerOpnameNuWeide ?? 5,
+      byproductIntake: scenario.bijproductenOpnameNuWeide ?? 0,
+      grassSilageIntake: currentGrassSilage,
+      maizeSilageIntake: scenario.maiskuilOpnameNuWeide ?? 0,
+    },
+    feedStable: {
+      grassIntake: 0,
+      concentrateIntake: scenario.krachtvoerOpnameNuStal ?? 5,
+      byproductIntake: scenario.bijproductenOpnameNuStal ?? 0,
+      grassSilageIntake: scenario.graskuilOpnameNuStal ?? 15,
+      maizeSilageIntake: scenario.maiskuilOpnameNuStal ?? 0,
+    },
+    market: {
+      milkPrice: scenario.melkprijs ?? 0.45,
+      concentratePrice: scenario.krachtvoerPrijs ?? 0.35,
+      byproductPrice: scenario.bijproductenPrijs ?? 0.25,
+      litterCost: scenario.strooiselKosten ?? 5,
+      manureSpreadCost: scenario.mestuitrijdenKosten ?? 3,
+      labourCost: scenario.arbeidWaarde ?? 35,
+      grassCostField: 0.08,
+      silageCost: 0.18,
+      urineProduction: 17,
+      manureProduction: 71.23,
+    },
+    collieGrazing: {
+      newTotalDays: scenario.weidedagenCollie ?? currentGrazingDays,
+      newTotalGrazingHours: scenario.urenCollie ?? currentGrazingHours,
+      newGrazingLabour: scenario.arbeidBeweidingCollieWeide ?? 0.15,
+      newStallLabourWeidedagen: scenario.arbeidStalCollieWeide ?? 0.5,
+      newMilkings: hasRobot
+        ? (scenario.melkingenCollieRobot ?? 2.3)
+        : (scenario.melkingenCollieMelkstal ?? 2),
+      newMilkProduction: scenario.melkproductieCollie ?? scenario.melkproductie ?? 9000,
+      newGrassIntake: collieGrassIntake,
+      newConcentrateIntake: scenario.krachtvoerOpnameCollieWeide ?? 4,
+      newByproductIntake: scenario.bijproductenOpnameCollieWeide ?? 0,
+      newGrassSilageIntake: collieGrassSilage,
+      newMaizeSilageIntake: scenario.maiskuilOpnameCollieWeide ?? 0,
+    },
+    collieStable: {
+      newStallLabour: scenario.arbeidStalNuStal ?? 2.0,
+      newGrassIntake: 0,
+      newConcentrateIntake: scenario.krachtvoerOpnameNuStal ?? 5,
+      newByproductIntake: scenario.bijproductenOpnameNuStal ?? 0,
+      newGrassSilageIntake: scenario.graskuilOpnameNuStal ?? 15,
+      newMaizeSilageIntake: scenario.maiskuilOpnameNuStal ?? 0,
+    },
+  };
+}
+
+function calculate(state) {
+  const { farm, grazing, feedGrazing, feedStable, market, collieGrazing, collieStable } = state;
+
+  const collarPrice = getCollarPrice(farm.numCows);
+  const weidedagenNu = grazing.totalDays || 0;
+  const staldagenNu = 365 - weidedagenNu;
+  const weidedagenCollie = collieGrazing.newTotalDays || weidedagenNu;
+  const staldagenCollie = 365 - weidedagenCollie;
+
+  // Arbeid
+  const labourNuWeide = (grazing.grazingLabourHours + grazing.stallLabourHours) * weidedagenNu;
+  const labourNuStal = grazing.stallLabourStaldagen * staldagenNu;
+  const totalLabourNu = labourNuWeide + labourNuStal;
+  const labourCollieWeide = (collieGrazing.newGrazingLabour + collieGrazing.newStallLabourWeidedagen) * weidedagenCollie;
+  const labourCollieStal = collieStable.newStallLabour * staldagenCollie;
+  const totalLabourCollie = labourCollieWeide + labourCollieStal;
+  const labourSavingHours = totalLabourNu - totalLabourCollie;
+  const labourSaving = labourSavingHours * market.labourCost;
+
+  // Melk
+  const extraMilkLitres = (collieGrazing.newMilkProduction - farm.milkProduction) * farm.numCows;
+  const milkSaving = extraMilkLitres * market.milkPrice;
+
+  // Krachtvoer
+  const concentrateNuYear = (feedGrazing.concentrateIntake * weidedagenNu) + (feedStable.concentrateIntake * staldagenNu);
+  const concentrateCollieYear = (collieGrazing.newConcentrateIntake * weidedagenCollie) + (collieStable.newConcentrateIntake * staldagenCollie);
+  const concentrateSaved = (concentrateNuYear - concentrateCollieYear) * farm.numCows;
+  const concentrateSaving = market.concentratePrice * concentrateSaved;
+
+  // Bijproducten
+  const byproductNuYear = (feedGrazing.byproductIntake * weidedagenNu) + (feedStable.byproductIntake * staldagenNu);
+  const byproductCollieYear = (collieGrazing.newByproductIntake * weidedagenCollie) + (collieStable.newByproductIntake * staldagenCollie);
+  const byproductSaved = (byproductNuYear - byproductCollieYear) * farm.numCows;
+  const byproductSaving = market.byproductPrice * byproductSaved;
+
+  // Kuilvoer
+  const grassSilageNuYear = (feedGrazing.grassSilageIntake * weidedagenNu) + (feedStable.grassSilageIntake * staldagenNu);
+  const grassSilageCollieYear = (collieGrazing.newGrassSilageIntake * weidedagenCollie) + (collieStable.newGrassSilageIntake * staldagenCollie);
+  const silageSaved = (grassSilageNuYear - grassSilageCollieYear) * farm.numCows;
+  const silageSaving = silageSaved * (market.silageCost - market.grassCostField);
+
+  // Strooisel
+  const litterSaving = market.litterCost * weidedagenCollie;
+
+  // Mest
+  const totalExcretionPerCowPerDay = market.urineProduction + market.manureProduction;
+  const hoursInYear = 8760;
+  const manureInsideCurrent = ((totalExcretionPerCowPerDay / 24) * (hoursInYear - grazing.totalGrazingHours) * farm.numCows) / 1000;
+  const manureInsideCollie = ((totalExcretionPerCowPerDay / 24) * (hoursInYear - collieGrazing.newTotalGrazingHours) * farm.numCows) / 1000;
+  const manureSaved = manureInsideCurrent - manureInsideCollie;
+  const manureSaving = manureSaved * market.manureSpreadCost;
+
+  const grossBenefit = labourSaving + milkSaving + concentrateSaving + byproductSaving + silageSaving + litterSaving + manureSaving;
+  const collarCost = collarPrice * farm.numCows;
+  const netBenefit = grossBenefit - collarCost;
+  const netPerCow = farm.numCows > 0 ? netBenefit / farm.numCows : 0;
+
+  return {
+    labourSavingHours, labourSaving, extraMilkLitres, milkSaving,
+    concentrateSaved, concentrateSaving, byproductSaved, byproductSaving,
+    silageSaved, silageSaving, litterSaving, manureSaved, manureSaving,
+    grossBenefit, collarCost, collarPrice, netBenefit, netPerCow,
+    weidedagen: weidedagenNu, staldagen: staldagenNu,
+    weidedagenCollie, staldagenCollie,
+  };
+}
+
+// ============================================================
+// FORMAT HELPERS
+// ============================================================
+function formatEuro(val) {
+  if (val == null || isNaN(val)) return '€ 0';
+  const abs = Math.abs(Math.round(val));
+  const formatted = abs.toLocaleString('nl-NL');
+  return val < 0 ? `-€ ${formatted}` : `€ ${formatted}`;
+}
+
+function formatNum(val, dec = 0) {
+  if (val == null || isNaN(val)) return '0';
+  return Number(val).toLocaleString('nl-NL', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+
+// ============================================================
+// RENDER ENGINE
+// ============================================================
+function render() {
+  renderProgress();
+  renderContent();
+  renderNav();
+}
+
+function renderProgress() {
+  const bar = document.getElementById('progressBar');
+  const labels = document.getElementById('progressLabels');
+  bar.innerHTML = STEPS.map((s, i) => {
+    const cls = i < currentStep ? 'done' : i === currentStep ? 'active' : 'future';
+    return `<div class="progress-dot ${cls}" onclick="goToStep(${i})"></div>`;
+  }).join('');
+  labels.innerHTML = STEPS.map((s, i) => {
+    const cls = i === currentStep ? 'active' : '';
+    return `<span class="${cls}" onclick="goToStep(${i})">${s.title}</span>`;
+  }).join('');
+}
+
+function goToStep(i) {
+  // Only allow going to completed steps or next step
+  if (i <= currentStep) {
+    currentStep = i;
+    focusedField = null;
+    render();
+  }
+}
+
+function renderNav() {
+  const nav = document.getElementById('nav');
+  const step = STEPS[currentStep];
+
+  if (step.id === 'teaser') {
+    const allFilled = teaserInputs.numCows > 0 && teaserInputs.hectaresAvailable > 0
+      && teaserInputs.currentGrazingHours > 0 && teaserInputs.currentGrazingDays > 0;
+    nav.innerHTML = `
+      <div></div>
+      <button class="nav-btn next" ${!allFilled ? 'disabled' : ''} onclick="handleTeaserCalculate()">
+        Bereken
+      </button>
+    `;
+    return;
+  }
+
+  if (step.id === 'resultaat') {
+    nav.innerHTML = `
+      <button class="nav-btn prev" onclick="prevStep()">Vorige</button>
+      <div></div>
+    `;
+    return;
+  }
+
+  // Mini result for steps 3-6
+  let miniHtml = '';
+  if (calcState && currentStep >= 2) {
+    const r = calculate(calcState);
+    const cls = r.netBenefit >= 0 ? 'pos' : 'neg';
+    miniHtml = `
+      <div class="mini-result">
+        <div class="mini-label">Netto rendement</div>
+        <div class="mini-value ${cls}">${formatEuro(r.netBenefit)}</div>
+      </div>
+    `;
+  }
+
+  const nextLabel = step.id === 'contact' ? 'Ga verder' : 'Volgende';
+  const nextDisabled = step.id === 'contact' && !isContactValid();
+
+  nav.innerHTML = `
+    <button class="nav-btn prev" onclick="prevStep()">Vorige</button>
+    ${miniHtml}
+    <button class="nav-btn next" ${nextDisabled ? 'disabled' : ''} onclick="nextStep()">
+      ${nextLabel}
+    </button>
+  `;
+}
+
+function prevStep() {
+  if (currentStep > 0) { currentStep--; focusedField = null; render(); }
+}
+
+function nextStep() {
+  if (currentStep < STEPS.length - 1) {
+    if (STEPS[currentStep].id === 'contact') {
+      saveLead();
+    }
+    currentStep++;
+    focusedField = null;
+    render();
+  }
+}
+
+function isContactValid() {
+  return contactData.naam.trim() && contactData.email.trim() && contactData.bedrijfsnaam.trim();
+}
+
+// ============================================================
+// TEASER
+// ============================================================
+function handleTeaserCalculate() {
+  // Calculate range using conservatief and optimistisch scenarios
+  const stateC = buildCalculatorState(teaserInputs, SCENARIOS.conservatief);
+  const stateO = buildCalculatorState(teaserInputs, SCENARIOS.optimistisch);
+  const resultC = calculate(stateC);
+  const resultO = calculate(stateO);
+  teaserResult = { conservatief: resultC.netBenefit, optimistisch: resultO.netBenefit };
+
+  // Build full calc state from gemiddeld for the extended calculator
+  calcState = buildCalculatorState(teaserInputs, SCENARIOS.gemiddeld);
+
+  render();
+}
+
+// ============================================================
+// SUPABASE: Save lead
+// ============================================================
+async function saveLead() {
+  if (!supabase) return;
+  try {
+    const { data, error } = await supabase.from('leads').insert({
+      naam: contactData.naam,
+      email: contactData.email,
+      bedrijfsnaam: contactData.bedrijfsnaam,
+      telefoon: contactData.telefoon,
+      provincie: contactData.provincie,
+      aantal_koeien: teaserInputs.numCows,
+      hectares: teaserInputs.hectaresAvailable,
+      uren_nu: teaserInputs.currentGrazingHours,
+      dagen_nu: teaserInputs.currentGrazingDays,
+      melkrobot: teaserInputs.hasRobot,
+    }).select('id').single();
+    if (data) leadId = data.id;
+  } catch (e) { console.error('Lead save error:', e); }
+}
+
+async function saveBerekening() {
+  if (!supabase || !calcState) return;
+  try {
+    const r = calculate(calcState);
+    await supabase.from('berekeningen').insert({
+      lead_id: leadId,
+      stap: 'resultaat',
+      netto_rendement: r.netBenefit,
+      bruto_baten: r.grossBenefit,
+      collar_kosten: r.collarCost,
+      arbeid_besparing: r.labourSaving,
+      krachtvoer_besparing: r.concentrateSaving,
+      kuilvoer_besparing: r.silageSaving,
+      strooisel_besparing: r.litterSaving,
+      mest_besparing: r.manureSaving,
+      extra_melk: r.milkSaving,
+      form_data: calcState,
+    });
+  } catch (e) { console.error('Berekening save error:', e); }
+}
+
+// ============================================================
+// CONTENT RENDERERS
+// ============================================================
+function renderContent() {
+  const main = document.getElementById('mainContent');
+  const step = STEPS[currentStep];
+
+  switch (step.id) {
+    case 'teaser': return renderTeaser(main);
+    case 'contact': return renderContact(main);
+    case 'beweiding': return renderBeweiding(main);
+    case 'melk': return renderMelk(main);
+    case 'voer': return renderVoer(main);
+    case 'prijzen': return renderPrijzen(main);
+    case 'resultaat': return renderResultaat(main);
+  }
+}
+
+// ---- STEP 1: TEASER ----
+function renderTeaser(el) {
+  let resultHtml = '';
+  if (teaserResult) {
+    const hint = teaserInputs.currentGrazingHours > 2000
+      ? 'Je weid al veel. Collie kan vooral helpen het makkelijker en efficiënter te maken.'
+      : `We zien potentieel om meer te weiden met de ${teaserInputs.hectaresAvailable} hectare die je beschikbaar hebt. Collie kan helpen dit te benutten.`;
+    resultHtml = `
+      <div class="teaser-result">
+        <div class="range-label">Geschat rendement</div>
+        <div class="range-value">${formatEuro(teaserResult.conservatief)} — ${formatEuro(teaserResult.optimistisch)}</div>
+        <div class="range-hint">${hint}</div>
+        <button class="nav-btn next" style="margin-top:16px;width:100%" onclick="currentStep=1;render()">
+          Start uitgebreide berekening
+        </button>
+      </div>
+    `;
+  }
+
+  el.innerHTML = `
+    <div class="card">
+      <h2>Bereken wat Collie voor jou kan opleveren</h2>
+      <p class="subtitle">Vul je bedrijfsgegevens in voor een eerste schatting.</p>
+      ${fieldRow('numCows', 'Hoeveel melkkoeien heb je?', teaserInputs.numCows, 'koeien', 'Vul het aantal melkkoeien in dat je wilt beweiden met Collie.')}
+      ${fieldRow('hectares', 'Hoeveel hectare grasland kun je beweiden?', teaserInputs.hectaresAvailable, 'hectare', 'Het totaal beschikbare grasland voor beweiding.')}
+      ${fieldRow('hours', 'Hoeveel uren per jaar weiden je koeien nu?', teaserInputs.currentGrazingHours, 'uren/jaar', 'Tel alle uren op dat je koeien buiten lopen. Bijv. 180 dagen × 10 uur = 1.800 uur.')}
+      ${fieldRow('days', 'Hoeveel dagen per jaar weiden je koeien nu?', teaserInputs.currentGrazingDays, 'dagen/jaar', 'Het aantal dagen dat je koeien (deels) buiten lopen.')}
+      ${toggleRow('robot', 'Melkrobot', teaserInputs.hasRobot)}
+      ${resultHtml}
+    </div>
+  `;
+}
+
+function fieldRow(id, label, value, unit, info) {
+  const isFocused = focusedField === id;
+  const displayVal = value != null ? value : '';
+  let infoHtml = isFocused && info ? `<div class="field-info">${info}</div>` : '';
+  return `
+    <div class="field-row ${isFocused ? 'focused' : ''}" onclick="setFocus('${id}')">
+      <div class="field-label">${label}</div>
+      <div class="field-input-group">
+        <input type="number" value="${displayVal}" min="0"
+          onfocus="setFocus('${id}')"
+          oninput="updateTeaser('${id}', this.value)">
+        <span class="field-unit">${unit}</span>
+      </div>
+    </div>
+    ${infoHtml}
+  `;
+}
+
+function toggleRow(id, label, value) {
+  return `
+    <div class="field-row">
+      <div class="field-label">${label}</div>
+      <div class="toggle-group">
+        <button class="toggle-opt ${!value ? 'on' : ''}" onclick="updateTeaser('${id}', false)">Nee</button>
+        <button class="toggle-opt ${value ? 'on' : ''}" onclick="updateTeaser('${id}', true)">Ja</button>
+      </div>
+    </div>
+  `;
+}
+
+function setFocus(id) { focusedField = id; render(); }
+
+function updateTeaser(field, value) {
+  teaserResult = null; // Reset result on change
+  switch (field) {
+    case 'numCows': teaserInputs.numCows = value ? Number(value) : null; break;
+    case 'hectares': teaserInputs.hectaresAvailable = value ? Number(value) : null; break;
+    case 'hours': teaserInputs.currentGrazingHours = value ? Number(value) : null; break;
+    case 'days': teaserInputs.currentGrazingDays = value ? Number(value) : null; break;
+    case 'robot': teaserInputs.hasRobot = value; break;
+  }
+  renderNav();
+}
+
+// ---- STEP 2: CONTACT ----
+function renderContact(el) {
+  const provincies = ['Drenthe','Flevoland','Friesland','Gelderland','Groningen','Limburg','Noord-Brabant','Noord-Holland','Overijssel','Utrecht','Zeeland','Zuid-Holland'];
+  el.innerHTML = `
+    <div class="card">
+      <h2>Contactgegevens</h2>
+      <p class="subtitle">Vul je gegevens in om verder te gaan met de uitgebreide berekening.</p>
+      <div class="form-field">
+        <label>Naam *</label>
+        <input type="text" value="${contactData.naam}" oninput="contactData.naam=this.value;renderNav()">
+      </div>
+      <div class="form-field">
+        <label>E-mail *</label>
+        <input type="email" value="${contactData.email}" oninput="contactData.email=this.value;renderNav()">
+      </div>
+      <div class="form-field">
+        <label>Bedrijfsnaam *</label>
+        <input type="text" value="${contactData.bedrijfsnaam}" oninput="contactData.bedrijfsnaam=this.value;renderNav()">
+      </div>
+      <div class="form-field">
+        <label>Telefoonnummer</label>
+        <input type="tel" value="${contactData.telefoon}" oninput="contactData.telefoon=this.value">
+      </div>
+      <div class="form-field">
+        <label>Provincie</label>
+        <select onchange="contactData.provincie=this.value">
+          <option value="">Selecteer...</option>
+          ${provincies.map(p => `<option value="${p}" ${contactData.provincie === p ? 'selected' : ''}>${p}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+  `;
+}
+
+// ---- STEP 3: BEWEIDING ----
+function renderBeweiding(el) {
+  const g = calcState.grazing;
+  const c = calcState.collieGrazing;
+  el.innerHTML = `
+    <div class="card">
+      <h2>Beweiding</h2>
+      <p class="subtitle">Vergelijk jouw huidige beweiding met de situatie met Collie.</p>
+      <div class="compare-header">
+        <div></div>
+        <div class="col-nu">Nu</div>
+        <div class="col-collie">Met Collie</div>
+      </div>
+      ${compareRow('Totaal weidedagen', g.totalDays, c.newTotalDays, 'dagen/jr', 'grazing.totalDays', 'collieGrazing.newTotalDays')}
+      ${compareRow('Totaal weide-uren', g.totalGrazingHours, c.newTotalGrazingHours, 'uren/jr', 'grazing.totalGrazingHours', 'collieGrazing.newTotalGrazingHours')}
+      ${compareRow('Beweiding arbeid', g.grazingLabourHours, c.newGrazingLabour, 'uur/dag', 'grazing.grazingLabourHours', 'collieGrazing.newGrazingLabour', 0.01)}
+      ${compareRow('Stal arbeid weidedagen', g.stallLabourHours, c.newStallLabourWeidedagen, 'uur/dag', 'grazing.stallLabourHours', 'collieGrazing.newStallLabourWeidedagen', 0.01)}
+      ${compareRow('Stal arbeid staldagen', g.stallLabourStaldagen, calcState.collieStable.newStallLabour, 'uur/dag', 'grazing.stallLabourStaldagen', null, 0.01)}
+    </div>
+  `;
+}
+
+// ---- STEP 4: MELK ----
+function renderMelk(el) {
+  const f = calcState.farm;
+  const c = calcState.collieGrazing;
+  const g = calcState.grazing;
+  el.innerHTML = `
+    <div class="card">
+      <h2>Melkproductie</h2>
+      <p class="subtitle">Vergelijk je huidige melkproductie met de verwachte productie met Collie.</p>
+      <div class="compare-header">
+        <div></div>
+        <div class="col-nu">Nu</div>
+        <div class="col-collie">Met Collie</div>
+      </div>
+      ${compareRow('Melkproductie per koe', f.milkProduction, c.newMilkProduction, 'kg/jaar', 'farm.milkProduction', 'collieGrazing.newMilkProduction')}
+      ${compareRow('Melkingen per dag', g.milkingsPerDay, c.newMilkings, 'per dag', 'grazing.milkingsPerDay', 'collieGrazing.newMilkings', 0.1)}
+    </div>
+  `;
+}
+
+// ---- STEP 5: VOER ----
+function renderVoer(el) {
+  const fg = calcState.feedGrazing;
+  const fs = calcState.feedStable;
+  const cg = calcState.collieGrazing;
+  const cs = calcState.collieStable;
+
+  el.innerHTML = `
+    <div class="card">
+      <h2>Voerrantsoen</h2>
+      <p class="subtitle">Vergelijk het voerrantsoen per koe per dag. Weidegras en graskuil worden automatisch berekend.</p>
+
+      <div class="section-divider">Weidedagen</div>
+      <div class="compare-header">
+        <div></div>
+        <div class="col-nu">Nu</div>
+        <div class="col-collie">Met Collie</div>
+      </div>
+      ${compareRow('Weidegras opname', fg.grassIntake, cg.newGrassIntake, 'kg DS', null, null)}
+      ${compareRow('Graskuil opname', fg.grassSilageIntake, cg.newGrassSilageIntake, 'kg DS', null, null)}
+      ${compareRow('Krachtvoer opname', fg.concentrateIntake, cg.newConcentrateIntake, 'kg DS', 'feedGrazing.concentrateIntake', 'collieGrazing.newConcentrateIntake', 0.5)}
+      ${compareRow('Maiskuil opname', fg.maizeSilageIntake, cg.newMaizeSilageIntake, 'kg DS', 'feedGrazing.maizeSilageIntake', 'collieGrazing.newMaizeSilageIntake', 0.5)}
+      ${compareRow('Bijproducten opname', fg.byproductIntake, cg.newByproductIntake, 'kg DS', 'feedGrazing.byproductIntake', 'collieGrazing.newByproductIntake', 0.5)}
+
+      <div class="section-divider">Staldagen</div>
+      <div class="compare-header">
+        <div></div>
+        <div class="col-nu">Nu</div>
+        <div class="col-collie">Met Collie</div>
+      </div>
+      ${compareRow('Graskuil opname', fs.grassSilageIntake, cs.newGrassSilageIntake, 'kg DS', 'feedStable.grassSilageIntake', null, 0.5)}
+      ${compareRow('Krachtvoer opname', fs.concentrateIntake, cs.newConcentrateIntake, 'kg DS', 'feedStable.concentrateIntake', null, 0.5)}
+      ${compareRow('Maiskuil opname', fs.maizeSilageIntake, cs.newMaizeSilageIntake, 'kg DS', 'feedStable.maizeSilageIntake', null, 0.5)}
+      ${compareRow('Bijproducten opname', fs.byproductIntake, cs.newByproductIntake, 'kg DS', 'feedStable.byproductIntake', null, 0.5)}
+    </div>
+  `;
+}
+
+// ---- STEP 6: PRIJZEN ----
+function renderPrijzen(el) {
+  const m = calcState.market;
+  el.innerHTML = `
+    <div class="card">
+      <h2>Prijzen & kosten</h2>
+      <p class="subtitle">We hebben gemiddelde NL-waarden ingevuld. Pas aan naar jouw situatie.</p>
+      ${priceRow('Melkprijs', m.milkPrice, '€/kg', 'market.milkPrice', 0.01)}
+      ${priceRow('Krachtvoer prijs', m.concentratePrice, '€/kg DS', 'market.concentratePrice', 0.01)}
+      ${priceRow('Bijproducten prijs', m.byproductPrice, '€/kg DS', 'market.byproductPrice', 0.01)}
+      ${priceRow('Strooisel kosten', m.litterCost, '€/dag', 'market.litterCost', 0.5)}
+      ${priceRow('Mestuitrijden kosten', m.manureSpreadCost, '€/m³', 'market.manureSpreadCost', 0.5)}
+      ${priceRow('Arbeid waarde', m.labourCost, '€/uur', 'market.labourCost', 1)}
+    </div>
+  `;
+}
+
+function priceRow(label, value, unit, path, step) {
+  return `
+    <div class="field-row">
+      <div class="field-label">${label}</div>
+      <div class="field-input-group">
+        <input type="number" value="${value}" step="${step}" min="0"
+          oninput="updateCalcState('${path}', Number(this.value)); renderNav()">
+        <span class="field-unit">${unit}</span>
+      </div>
+    </div>
+  `;
+}
+
+// ---- STEP 7: RESULTAAT ----
+function renderResultaat(el) {
+  if (!calcState) return;
+  const r = calculate(calcState);
+
+  // Save to Supabase
+  saveBerekening();
+
+  // Breakdown items
+  const items = [
+    { label: 'Arbeid', value: r.labourSaving, color: 'var(--chart-labor)' },
+    { label: 'Extra melk', value: r.milkSaving, color: 'var(--chart-milk)' },
+    { label: 'Krachtvoer', value: r.concentrateSaving, color: 'var(--chart-feed)' },
+    { label: 'Kuilvoer', value: r.silageSaving, color: 'var(--chart-silage)' },
+    { label: 'Strooisel', value: r.litterSaving, color: 'var(--chart-litter)' },
+    { label: 'Mest', value: r.manureSaving, color: 'var(--chart-manure)' },
+  ];
+  const positiveItems = items.filter(i => i.value > 0);
+  const totalPositive = positiveItems.reduce((s, i) => s + i.value, 0);
+
+  const barHtml = positiveItems.map(i => {
+    const pct = totalPositive > 0 ? (i.value / totalPositive) * 100 : 0;
+    if (pct < 1) return '';
+    return `<div class="breakdown-segment" style="width:${pct}%;background:${i.color}">
+      ${pct > 8 ? `<span>${Math.round(pct)}%</span>` : ''}
+    </div>`;
+  }).join('');
+
+  const legendHtml = positiveItems.map(i =>
+    `<div class="breakdown-legend-item">
+      <div class="dot" style="background:${i.color}"></div>
+      <span>${i.label}: ${formatEuro(i.value)}</span>
+    </div>`
+  ).join('');
+
+  el.innerHTML = `
+    <div class="card">
+      <h2>Resultaat</h2>
+
+      <div class="result-hero">
+        <div class="hero-label">Netto rendement per jaar</div>
+        <div class="hero-value">${formatEuro(r.netBenefit)}</div>
+        <div class="hero-sub">${formatEuro(r.netPerCow)} per koe per jaar</div>
+      </div>
+
+      <div class="breakdown">
+        <h3>Opbouw besparingen</h3>
+        <div class="breakdown-bar">${barHtml}</div>
+        <div class="breakdown-legend">${legendHtml}</div>
+      </div>
+
+      <div class="result-grid">
+        <div class="result-card positive">
+          <div class="rc-label">Arbeidsbesparing</div>
+          <div class="rc-value">${formatEuro(r.labourSaving)}</div>
+          <div class="rc-detail">${formatNum(r.labourSavingHours, 0)} uur bespaard</div>
+        </div>
+        <div class="result-card positive">
+          <div class="rc-label">Extra melkopbrengst</div>
+          <div class="rc-value">${formatEuro(r.milkSaving)}</div>
+          <div class="rc-detail">${formatNum(r.extraMilkLitres, 0)} kg extra</div>
+        </div>
+        <div class="result-card positive">
+          <div class="rc-label">Krachtvoer besparing</div>
+          <div class="rc-value">${formatEuro(r.concentrateSaving)}</div>
+          <div class="rc-detail">${formatNum(r.concentrateSaved, 0)} kg DS bespaard</div>
+        </div>
+        <div class="result-card positive">
+          <div class="rc-label">Kuilvoer besparing</div>
+          <div class="rc-value">${formatEuro(r.silageSaving)}</div>
+          <div class="rc-detail">${formatNum(r.silageSaved, 0)} kg DS bespaard</div>
+        </div>
+        <div class="result-card positive">
+          <div class="rc-label">Bruto baten</div>
+          <div class="rc-value">${formatEuro(r.grossBenefit)}</div>
+        </div>
+        <div class="result-card cost">
+          <div class="rc-label">Collie kosten</div>
+          <div class="rc-value">${formatEuro(r.collarCost)}</div>
+          <div class="rc-detail">${formatEuro(r.collarPrice)} per kraag/jaar</div>
+        </div>
+      </div>
+
+      <div class="disclaimer">
+        <div class="d-title">Niet meegeteld in deze berekening</div>
+        <div class="d-text">
+          Besparing op hekwerk en onderhoud, gezondheidsdata en vroegtijdige ziekteherkenning,
+          minder klauwproblemen door meer weidegang, hogere melkvet- en eiwitgehaltes,
+          en de waarde van flexibel graslandbeheer.
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ============================================================
+// COMPARISON ROW HELPER
+// ============================================================
+function compareRow(label, valNu, valCollie, unit, pathNu, pathCollie, step = 1) {
+  const readonlyNu = !pathNu;
+  const readonlyCollie = !pathCollie;
+  const isReadonlyRow = readonlyNu && readonlyCollie;
+
+  const decNu = String(step).includes('.') ? String(step).split('.')[1].length : 0;
+  const displayNu = typeof valNu === 'number' ? valNu : '';
+  const displayCollie = typeof valCollie === 'number' ? valCollie : '';
+
+  return `
+    <div class="compare-row ${isReadonlyRow ? 'readonly' : ''}">
+      <div class="compare-label">${label} <span style="font-size:11px;color:rgba(21,36,53,0.3)">${unit}</span></div>
+      <input type="number" value="${displayNu}" step="${step}" min="0"
+        ${readonlyNu ? 'readonly' : ''}
+        oninput="updateCalcState('${pathNu}', Number(this.value)); recalcDerived(); render()">
+      <input type="number" value="${displayCollie}" step="${step}" min="0"
+        ${readonlyCollie ? 'readonly' : ''}
+        oninput="updateCalcState('${pathCollie}', Number(this.value)); recalcDerived(); render()">
+    </div>
+  `;
+}
+
+// ============================================================
+// STATE UPDATE HELPERS
+// ============================================================
+function updateCalcState(path, value) {
+  if (!path || !calcState) return;
+  const parts = path.split('.');
+  let obj = calcState;
+  for (let i = 0; i < parts.length - 1; i++) {
+    obj = obj[parts[i]];
+  }
+  obj[parts[parts.length - 1]] = value;
+}
+
+function recalcDerived() {
+  if (!calcState) return;
+  const g = calcState.grazing;
+  const cg = calcState.collieGrazing;
+
+  // Recalc grass intake (always derived)
+  calcState.feedGrazing.grassIntake = calcGrassIntake(g.totalGrazingHours, g.totalDays);
+  calcState.feedGrazing.grassSilageIntake = Math.max(0, 15 - calcState.feedGrazing.grassIntake);
+
+  cg.newGrassIntake = calcGrassIntake(cg.newTotalGrazingHours, cg.newTotalDays);
+  cg.newGrassSilageIntake = Math.max(0, 15 - cg.newGrassIntake);
+
+  // Staldagen collie = staldagen nu (sync)
+  calcState.collieStable.newStallLabour = g.stallLabourStaldagen;
+  calcState.collieStable.newConcentrateIntake = calcState.feedStable.concentrateIntake;
+  calcState.collieStable.newByproductIntake = calcState.feedStable.byproductIntake;
+  calcState.collieStable.newGrassSilageIntake = calcState.feedStable.grassSilageIntake;
+  calcState.collieStable.newMaizeSilageIntake = calcState.feedStable.maizeSilageIntake;
+}
+
+// ============================================================
+// INIT
+// ============================================================
+render();
+</script>
+</body>
+</html>
